@@ -24,7 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun SearchBar() {
+fun SearchBar(modifier: Modifier = Modifier) {
     var inputKeyWord by remember { mutableStateOf("") }
 
     TextField(
