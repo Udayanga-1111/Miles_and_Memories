@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">Miles &amp; Memories</string>
+
+    <string name="swissalps_title">Swiss Alps</string>
+    <string name="swissalps_description">Day three in the Swiss Alps was simply magical. Waking up in Wengen, I was greeted by the majestic, snow-capped peaks of the Eiger, Mönch, and Jungfrau mountains. We took a scenic cogwheel train up to a hiking trail, where wildflowers dotted lush green meadows, and the sound of cowbells filled the fresh mountain air. The views were breathtakingly beautiful, like a scene from a movie. Later, we relaxed by a crystal-clear alpine lake, its tranquil waters reflecting the towering pines. The sheer scale and peacefulness of nature here is awe-inspiring. I can’t believe a place this perfect exists. The friendly locals and delicious Swiss chocolate are just a bonus! Tomorrow, the plan is to explore the Lauterbrunnen Valley and its 72 waterfalls.</string>
+    <string name="swissalps_date">12th Dec, 2025</string>
+
+    <string name="tokyo_title">Tokyo</string>
+    <string name="tokyo_description">Tokyo is a beautiful contradiction of neon lights and ancient traditions. We started our day at the Senso-ji Temple in Asakusa, where the scent of incense and the sound of temple bells felt like stepping back in time. By afternoon, we were in the heart of Shibuya, crossing the world’s busiest intersection amidst a sea of people and towering digital billboards. The energy here is electric! We grabbed a bowl of steaming, rich tonkotsu ramen at a hidden alleyway shop that lived up to the hype. Later, we found a moment of Zen in the Meiji Jingu forest, a peaceful sanctuary of towering trees right in the middle of the urban chaos. The city is impeccably clean, and every corner holds a new surprise, from high-tech vending machines to tiny, charming boutiques. Tomorrow, we’re taking the Shinkansen to see Mount Fuji!</string>
+    <string name="tokyo_date">25th Sept, 2025</string>
+
+    <string name="maldives_title">Maldives</string>
+    <string name="maldives_description">Waking up in an overwater villa was a dream come true. The Indian Ocean stretched out in every direction, a mesmerizing palette of turquoise and deep sapphire. We spent the morning snorkeling right off our private deck, swimming alongside graceful sea turtles and schools of neon-colored fish darting through the vibrant coral reefs. After a lunch of fresh grilled seafood, we took a traditional dhoni boat to a secluded sandbank—just a tiny sliver of white sand in the middle of the sea. Feeling the soft, powdery sand between my toes while watching the sun dip below the horizon was pure bliss. This island paradise feels like a world away from reality. Tonight, the bioluminescent plankton turned the shoreline into a glowing starry sky! Tomorrow, we’re heading out for a sunset dolphin cruise.</string>
+    <string name="maldives_date">18th Jul, 2025</string>
+
+    <string name="amazon_title">Amazon Rainforest</string>
+    <string name="amazon_description">Deep in the heart of the Amazon, the world sounds completely different. We woke up at an eco-lodge to the prehistoric roar of howler monkeys and the melodic chirping of exotic birds. Today’s river excursion was unforgettable; we spotted pink river dolphins surfacing in the dark, tea-colored waters and a three-toed sloth lazily hanging from a cecropia tree. Our guide led us on a jungle trek where we learned about medicinal plants and caught a glimpse of an iridescent blue morpho butterfly fluttering through the dense canopy. The air is thick, humid, and smells of damp earth and life. There’s something deeply humbling about being in the "lungs of the planet," surrounded by such raw, untamed biodiversity. As the sun set, the jungle transformed into a symphony of nocturnal insects and frogs. Tomorrow, we’re visiting a local ribeirinho community to learn about life on the river.</string>
+    <string name="amazon_date">10th Feb, 2025</string>
+
+</resources>
