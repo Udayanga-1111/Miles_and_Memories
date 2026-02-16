@@ -100,7 +100,7 @@ fun NoteDetailsPage(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { navController.navigate("add_note_page/Edit Note/$title/$description") }) {
+                    IconButton(onClick = { navController.navigate("add_note_page/Edit Note/$title/$description/$date") }) {
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Edit",

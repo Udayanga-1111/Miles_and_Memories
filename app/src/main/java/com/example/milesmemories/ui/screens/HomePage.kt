@@ -39,7 +39,7 @@ fun HomePage(navController: NavController) {
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { navController.navigate("add_note_page/New Note//")},
+                onClick = { navController.navigate("add_note_page/New Note///Select Date")},
                 containerColor = MaterialTheme.colorScheme.primary,
             ) {
                 FAB()
