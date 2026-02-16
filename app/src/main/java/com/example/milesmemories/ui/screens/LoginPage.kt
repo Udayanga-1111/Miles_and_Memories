@@ -145,7 +145,7 @@ fun LoginPage(
 
             // Login Button
             Button(
-                onClick = {navController.navigate("home_screen"){popUpTo("login_page") { inclusive = true } } },
+                onClick = {navController.navigate("home_screen"){ popUpTo(0) { inclusive = true }} },
                 modifier = Modifier
                     .width(400.dp)
                     .height(50.dp),

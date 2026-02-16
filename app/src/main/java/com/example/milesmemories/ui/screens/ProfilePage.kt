@@ -51,8 +51,6 @@ fun ProfilePage(
     isDarkTheme: Boolean,
     onThemeChange: (Boolean) -> Unit
 ) {
-    // Removed unused configuration
-
 
     Scaffold(
         topBar = {
@@ -224,7 +222,9 @@ fun ConfirmLogout(
             text = { Text("Are you sure you want to log out?") },
             confirmButton = {
                 TextButton(onClick = { onConfirm() }) {
-                    Text("Logout")
+                    Text(
+                        "Logout",
+                        color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
