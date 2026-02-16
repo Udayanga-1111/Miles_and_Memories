@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.milesmemories.R
+import com.example.milesmemories.data.NavigationList.items
 import com.example.milesmemories.models.Screen
 
 
@@ -53,12 +54,6 @@ fun NavigationBar(modifier: Modifier = Modifier, navController: NavController) {
             modifier = Modifier.fillMaxWidth()
                 .padding(vertical = 10.dp)
         ) {
-            val items = listOf(
-                NavigationItem(Screen.HomePage.route, R.drawable.nav_home_icon, "Home"),
-                NavigationItem(Screen.FavoritePage.route, R.drawable.nav_fav_icon, "Favorites"),
-                NavigationItem(Screen.AlbumPage.route, R.drawable.nav_album_icon, "Album"),
-                NavigationItem(Screen.ProfilePage.route, R.drawable.nav_profile_icon, "Profile")
-            )
 
             items.forEach { item ->
                 NavLink(
@@ -82,7 +77,7 @@ fun NavigationBar(modifier: Modifier = Modifier, navController: NavController) {
     }
 }
 
-private data class NavigationItem(val route: String, val icon: Int, val label: String)
+
 
 @Composable
 fun NavLink(

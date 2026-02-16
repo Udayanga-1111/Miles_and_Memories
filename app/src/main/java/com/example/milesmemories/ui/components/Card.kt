@@ -78,7 +78,7 @@ fun PortraitCard(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Action Buttons (Top Right Overlay)
+            // Action Buttons
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -159,7 +159,7 @@ fun LandscapeCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(160.dp), // Fixed height
+                .height(160.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Card Cover Image

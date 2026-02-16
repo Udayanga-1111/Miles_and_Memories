@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.milesmemories.R
 import com.example.milesmemories.data.CountryImages
-import com.example.milesmemories.models.navController
 
 @Composable
 fun AlbumCard(

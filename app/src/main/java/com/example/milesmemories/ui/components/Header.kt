@@ -96,6 +96,7 @@ fun TitleHeader(searchBar: Boolean) {
                 modifier = Modifier.padding(vertical = 5.dp, horizontal = 10.dp)
             )
 
+            // Search bar for Landscape mode
             if (isLandscape && searchBar) {
                 Icon(
                     imageVector = Icons.Default.Search,

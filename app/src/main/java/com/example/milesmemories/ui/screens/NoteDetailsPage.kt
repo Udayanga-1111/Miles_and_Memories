@@ -63,7 +63,6 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.milesmemories.R
 import com.example.milesmemories.data.CountryImages
-import com.example.milesmemories.models.navController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
