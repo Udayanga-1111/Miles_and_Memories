@@ -1,6 +1,5 @@
 package com.example.milesmemories.ui.screens
 
-
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -22,20 +21,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -51,36 +47,40 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.milesmemories.models.Screen
-
+import com.example.milesmemories.ui.components.DatePicker
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun AddNotePage(
     navController: NavController,
-    page:String,
+    page: String,
     title: String?,
-    description: String?
+    description: String?,
+    date: String?
 ) {
-    var title by remember {
-        if (title != null) {
-            mutableStateOf(title)
-        } else {
-            mutableStateOf("")
-        }
+    var noteTitle by remember {
+        mutableStateOf(title ?: "")
     }
 
     var noteContent by remember {
-        if (description != null) {
-            mutableStateOf(description)
-        } else {
-            mutableStateOf("")
-        }
+        mutableStateOf(description ?: "")
     }
+    
+    var selectedDateMillis by remember { mutableStateOf<Long?>(System.currentTimeMillis()) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    
+    var dateString = date ?: remember(selectedDateMillis) {
+        selectedDateMillis?.let {
+            SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(it))
+        } ?: "Select Date"
+    }
+
     val selectedImages = remember { mutableStateListOf<Uri>() }
 
     // Image picker launcher
@@ -111,11 +111,8 @@ fun AddNotePage(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-
                     Discard(navController)
-
                     Spacer(modifier = Modifier.width(8.dp))
-
                     IconButton(onClick = { /* To be Implemented */ }) {
                         Icon(
                             imageVector = Icons.Default.Save,
@@ -135,8 +132,8 @@ fun AddNotePage(
         ) {
             // Title Input
             TextField(
-                value = title,
-                onValueChange = { title = it },
+                value = noteTitle,
+                onValueChange = { noteTitle = it },
                 placeholder = {
                     Text(
                         "Title",
@@ -155,6 +152,40 @@ fun AddNotePage(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
             )
+
+            // Date Picker
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showDatePicker = true }
+                    .padding(vertical = 8.dp, horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CalendarToday,
+                    contentDescription = "Select Date",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = dateString,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            if (showDatePicker) {
+                DatePicker(
+                    onDateSelected = {
+                        selectedDateMillis = it
+                        dateString = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(it!!))
+                        showDatePicker = false},
+                    onDismiss = { showDatePicker = false }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Note Content Input
             TextField(
@@ -221,7 +252,9 @@ fun AddNotePage(
                 if (selectedImages.isNotEmpty()) {
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth().height(100.dp) // Fixed height for image preview
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp)
                     ) {
                         items(selectedImages) { uri ->
                             Box(
@@ -245,7 +278,10 @@ fun AddNotePage(
                                         .align(Alignment.TopEnd)
                                         .padding(4.dp)
                                         .size(20.dp)
-                                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
+                                        .background(
+                                            Color.Black.copy(alpha = 0.5f),
+                                            RoundedCornerShape(50)
+                                        )
                                         .padding(2.dp)
                                         .clickable { selectedImages.remove(uri) }
                                 )
@@ -259,7 +295,7 @@ fun AddNotePage(
 }
 
 @Composable
-fun Discard(navController: NavController){
+fun Discard(navController: NavController) {
     var showDialog by remember { mutableStateOf(false) }
     Text(
         text = "Discard",
@@ -267,14 +303,16 @@ fun Discard(navController: NavController){
         color = MaterialTheme.colorScheme.error,
         modifier = Modifier
             .padding(8.dp)
-            .clickable{ showDialog = true }
+            .clickable { showDialog = true }
     )
 
     ConfirmDiscard(
         showDialog,
         onDismiss = { showDialog = false },
-        onConfirm = { showDialog = false
-            navController.navigate("home_screen") }
+        onConfirm = {
+            showDialog = false
+            navController.navigate("home_screen")
+        }
     )
 }
 
@@ -283,16 +321,18 @@ fun ConfirmDiscard(
     showDialog: Boolean,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
-){
-    if (showDialog){
+) {
+    if (showDialog) {
         AlertDialog(
             onDismissRequest = { onDismiss() },
             title = { Text("Confirm Discard") },
             text = { Text("Are you sure you want to Discard?") },
             confirmButton = {
                 TextButton(onClick = { onConfirm() }) {
-                    Text("Discard",
-                        color = MaterialTheme.colorScheme.error)
+                    Text(
+                        "Discard",
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             },
             dismissButton = {

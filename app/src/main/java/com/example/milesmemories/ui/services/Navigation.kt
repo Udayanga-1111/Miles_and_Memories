@@ -68,7 +68,8 @@ fun Navigation(isDarkTheme: Boolean, onThemeChange: (Boolean) -> Unit) {
             arguments = listOf(
                 navArgument("page"){ type = NavType.StringType},
                 navArgument("title") { type = NavType.StringType },
-                navArgument("description") { type = NavType.StringType }
+                navArgument("description") { type = NavType.StringType },
+                navArgument("date") { type = NavType.StringType }
             )
 
         ) {backStackEntry ->
@@ -76,12 +77,15 @@ fun Navigation(isDarkTheme: Boolean, onThemeChange: (Boolean) -> Unit) {
             val page = args?.getString("page") ?: ""
             val title = args?.getString("title") ?: ""
             val description = args?.getString("description") ?: ""
+            val date = args?.getString("date") ?: ""
+
 
             AddNotePage(
                 navController,
                 page,
                 title,
                 description,
+                date
             )
         }
         
