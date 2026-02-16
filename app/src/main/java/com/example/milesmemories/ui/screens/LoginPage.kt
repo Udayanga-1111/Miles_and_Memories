@@ -127,7 +127,7 @@ fun LoginPage(
                 )
             )
 
-            // Forgot Password Link
+            // Forgot Password
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End

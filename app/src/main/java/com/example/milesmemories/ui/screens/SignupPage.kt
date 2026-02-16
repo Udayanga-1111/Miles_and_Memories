@@ -151,7 +151,7 @@ fun SignupPage(
 
             // Sign Up Button
             Button(
-                onClick = {navController.navigate("home_screen")},
+                onClick = {navController.navigate("home_screen"){ popUpTo(0) { inclusive = true }}},
                 modifier = Modifier
                     .width(400.dp)
                     .height(50.dp),
