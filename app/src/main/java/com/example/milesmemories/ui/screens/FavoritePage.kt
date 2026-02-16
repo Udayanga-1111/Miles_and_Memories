@@ -33,7 +33,7 @@ fun FavoritePage(navController: NavController){
 
     Scaffold(
         topBar = {
-            TitleHeader()
+            TitleHeader(true)
         },
         bottomBar = {
             NavigationBar(navController = navController)

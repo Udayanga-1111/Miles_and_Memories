@@ -35,7 +35,7 @@ fun AlbumPage(navController: NavController){
 
     Scaffold(
         topBar = {
-            TitleHeader()
+            TitleHeader(false)
         },
         bottomBar = {
             NavigationBar(navController = navController)

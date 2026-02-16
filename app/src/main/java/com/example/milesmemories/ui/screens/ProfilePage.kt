@@ -54,7 +54,7 @@ fun ProfilePage(
 
     Scaffold(
         topBar = {
-            TitleHeader()
+            TitleHeader(false)
         },
         bottomBar = {
             NavigationBar(navController = navController)
