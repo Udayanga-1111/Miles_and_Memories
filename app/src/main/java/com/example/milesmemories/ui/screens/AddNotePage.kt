@@ -1,6 +1,11 @@
 package com.example.milesmemories.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.media.MediaRecorder
 import android.net.Uri
+import androidx.core.content.ContextCompat
+import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,12 +25,16 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -47,8 +56,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.milesmemories.ui.components.DatePicker
@@ -71,6 +84,10 @@ fun AddNotePage(
     var noteContent by remember {
         mutableStateOf(description ?: "")
     }
+
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
     
     var selectedDateMillis by remember { mutableStateOf<Long?>(System.currentTimeMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -82,6 +99,11 @@ fun AddNotePage(
     }
 
     val selectedImages = remember { mutableStateListOf<Uri>() }
+    val selectedAudio = remember { mutableStateListOf<Uri>() }
+    
+    var isRecording by remember { mutableStateOf(false) }
+    var mediaRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    var currentAudioFile by remember { mutableStateOf<File?>(null) }
 
     // Image picker launcher
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -90,6 +112,62 @@ fun AddNotePage(
             selectedImages.addAll(uris)
         }
     )
+
+    // Audio Permission Launcher
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (!isGranted) {
+                Toast.makeText(context, "Permission Denied. Cannot record.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    )
+
+    fun startRecording() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+
+        val file = File(context.cacheDir, "audio_${System.currentTimeMillis()}.3gp")
+        val recorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            MediaRecorder(context)
+        } else {
+            @Suppress("DEPRECATION")
+            MediaRecorder()
+        }
+
+        recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+        recorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
+        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
+        recorder.setOutputFile(file.absolutePath)
+
+        try {
+            recorder.prepare()
+            recorder.start()
+            mediaRecorder = recorder
+            currentAudioFile = file
+            isRecording = true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, "Failed to start recording.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun stopRecording() {
+        try {
+            mediaRecorder?.stop()
+            mediaRecorder?.release()
+        } catch(e: Exception) {
+            e.printStackTrace()
+        }
+        mediaRecorder = null
+        isRecording = false
+        currentAudioFile?.let {
+            selectedAudio.add(Uri.fromFile(it))
+        }
+        currentAudioFile = null
+    }
 
     Scaffold(
         topBar = {
@@ -128,8 +206,13 @@ fun AddNotePage(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+            ) {
             // Title Input
             TextField(
                 value = noteTitle,
@@ -207,49 +290,74 @@ fun AddNotePage(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .defaultMinSize(minHeight = screenHeight * 0.6f)
             )
 
-            // Image Section
+            // Attached Items Lists
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
             ) {
-                // Add Image Button
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AddPhotoAlternate,
-                            contentDescription = "Add Image",
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
-                    }
+                // Selected Audio list
+                if (selectedAudio.isNotEmpty()) {
                     Text(
-                        text = "Add Images",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.clickable {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        }
+                        text = "Voice Records",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(vertical = 8.dp)
                     )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        selectedAudio.forEach { uri ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Mic,
+                                    contentDescription = "Audio Item",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Voice Record added",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove Audio",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { selectedAudio.remove(uri) }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Selected Images list
                 if (selectedImages.isNotEmpty()) {
+                    Text(
+                        text = "Images",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier
@@ -288,6 +396,71 @@ fun AddNotePage(
                             }
                         }
                     }
+                }
+            }
+            } // End of scrollable Column
+
+            // Action Buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Voice Button
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isRecording) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer)
+                        .clickable {
+                            if (isRecording) {
+                                stopRecording()
+                            } else {
+                                startRecording()
+                            }
+                        }
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Record Voice",
+                        tint = if (isRecording) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isRecording) "Stop" else "Voice Note",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (isRecording) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+
+                // Image Button
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clickable {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        }
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AddPhotoAlternate,
+                        contentDescription = "Add Image",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Add Image",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 }
             }
         }
