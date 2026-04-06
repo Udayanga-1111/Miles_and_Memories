@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -66,19 +65,17 @@ fun Navigation(isDarkTheme: Boolean, onThemeChange: (Boolean) -> Unit) {
         composable(
             route = Screen.AddNotePage.route,
             arguments = listOf(
-                navArgument("page"){ type = NavType.StringType},
-                navArgument("title") { type = NavType.StringType },
-                navArgument("description") { type = NavType.StringType },
-                navArgument("date") { type = NavType.StringType }
+                navArgument("page"){ type = NavType.StringType },
+                navArgument("title") { type = NavType.StringType; nullable = true; defaultValue = "" },
+                navArgument("description") { type = NavType.StringType; nullable = true; defaultValue = "" },
+                navArgument("date") { type = NavType.StringType; nullable = true; defaultValue = "Select Date" }
             )
-
-        ) {backStackEntry ->
+        ) { backStackEntry ->
             val args = backStackEntry.arguments
             val page = args?.getString("page") ?: ""
             val title = args?.getString("title") ?: ""
             val description = args?.getString("description") ?: ""
             val date = args?.getString("date") ?: ""
-
 
             AddNotePage(
                 navController,
@@ -92,32 +89,17 @@ fun Navigation(isDarkTheme: Boolean, onThemeChange: (Boolean) -> Unit) {
         composable(
             route = Screen.NoteDetailsPage.route,
             arguments = listOf(
-                navArgument("title") { type = NavType.IntType },
-                navArgument("description") { type = NavType.IntType },
-                navArgument("date") { type = NavType.IntType },
-                navArgument("coverImage") { type = NavType.IntType }
+                navArgument("noteId") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val args = backStackEntry.arguments
-            val titleRes = args?.getInt("title") ?: 0
-            val descRes = args?.getInt("description") ?: 0
-            val dateRes = args?.getInt("date") ?: 0
-            val coverImageArg = args?.getInt("coverImage") ?: 0
-            val coverImageRes = if (coverImageArg != 0) coverImageArg else null
-            
-            val title = if (titleRes != 0) stringResource(titleRes) else ""
-            val description = if (descRes != 0) stringResource(descRes) else ""
-            val date = if (dateRes != 0) stringResource(dateRes) else ""
+            val noteId = backStackEntry.arguments?.getString("noteId") ?: ""
 
             NoteDetailsPage(
-                title = title,
-                description = description,
-                date = date,
-                coverImageRes = coverImageRes,
+                noteId = noteId,
                 onNavigateBack = {
                     navController.popBackStack()
                 },
-                navController
+                navController = navController
             )
         }
 

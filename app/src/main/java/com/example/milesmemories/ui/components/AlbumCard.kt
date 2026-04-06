@@ -6,8 +6,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -25,6 +27,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.milesmemories.R
 import com.example.milesmemories.data.CountryImages
 
@@ -103,6 +106,100 @@ fun AlbumCard(
         // Album Name
         Text(
             text = destination,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    }
+}
+
+@Composable
+fun DynamicAlbumCard(
+    navController: NavController,
+    albumId: String,
+    title: String,
+    imageUrls: List<String>
+){
+    val image1 = imageUrls.getOrNull(0)
+    val image2 = imageUrls.getOrNull(1)
+    val image3 = imageUrls.getOrNull(2)
+
+    // Album Card
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(bottom = 5.dp)
+            .clickable(onClick = { navController.navigate(route = "picture_page/$albumId")})
+    ) {
+        ElevatedCard(
+            modifier = Modifier
+                .height(180.dp)
+                .width(180.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp)
+        ){
+            Column(
+                modifier = Modifier
+                    .border(
+                        BorderStroke(1.dp, color = MaterialTheme.colorScheme.outlineVariant),
+                        shape = RoundedCornerShape(20.dp)
+                    ),
+                verticalArrangement = Arrangement.SpaceBetween
+            ){
+                // Card Cover 1
+                if (image1 != null) {
+                    AsyncImage(
+                        model = image1,
+                        contentDescription = "pic 1",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                            .weight(1f)
+                            .fillMaxWidth()
+                    )
+                } else {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant))
+                }
+
+                Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
+                    if (image2 != null) {
+                        AsyncImage(
+                            model = image2,
+                            contentDescription = "pic2",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(bottomStart = 20.dp))
+                                .weight(1f)
+                                .border(
+                                    BorderStroke(1.dp, color = MaterialTheme.colorScheme.outlineVariant),
+                                    shape = RoundedCornerShape(bottomStart = 20.dp)
+                                )
+                        )
+                    } else {
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant))
+                    }
+                    if (image3 != null) {
+                        AsyncImage(
+                            model = image3,
+                            contentDescription = "pic3",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(bottomEnd = 20.dp))
+                                .weight(1f)
+                                .border(
+                                    BorderStroke(1.dp, color = MaterialTheme.colorScheme.outlineVariant),
+                                    shape = RoundedCornerShape(bottomEnd = 20.dp)
+                                )
+                        )
+                    } else {
+                         Box(modifier = Modifier.weight(1f).fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant))
+                    }
+                }
+            }
+        }
+        // Album Name
+        Text(
+            text = title,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
             modifier = Modifier.padding(top = 8.dp)

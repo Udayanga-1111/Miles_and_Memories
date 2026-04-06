@@ -42,7 +42,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.milesmemories.data.CountryImages
+import com.google.firebase.firestore.FirebaseFirestore
+import com.example.milesmemories.models.Album
+import androidx.compose.material3.CircularProgressIndicator
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,11 +57,22 @@ fun PicturePage(
     val verticalScroll: ScrollState = rememberScrollState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val imageList = CountryImages.countryImages[title]
-
+    
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
+    var album by remember { mutableStateOf<Album?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(title) {
         visible = true
+        FirebaseFirestore.getInstance().collection("albums").document(title)
+            .get()
+            .addOnSuccessListener { doc ->
+                album = doc.toObject(Album::class.java)
+                isLoading = false
+            }
+            .addOnFailureListener {
+                isLoading = false
+            }
     }
 
     Scaffold(
@@ -101,36 +114,46 @@ fun PicturePage(
                 )
                 .padding(innerPadding)
         ) {
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 15.dp, horizontal = 10.dp),
-                horizontalArrangement = if(isLandscape){
-                    Arrangement.Start
-                }else{
-                    Arrangement.SpaceEvenly
-                }
-            ) {
-                imageList?.forEachIndexed { index, image ->
-                    val delay = index * 100
-                    AnimatedVisibility(
-                        visible = visible,
-                        enter = fadeIn(
-                            animationSpec = tween(durationMillis = 500, delayMillis = delay)
-                        ) + scaleIn(
-                            initialScale = 0.8f,
-                            animationSpec = tween(durationMillis = 500, delayMillis = delay)
-                        ),
-                        modifier = Modifier.padding(5.dp)
-                    )
-                    {
-                        AsyncImage(
-                            model = image,
-                            contentDescription = "Image",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(120.dp)
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.padding(20.dp).align(Alignment.CenterHorizontally))
+            } else if (album == null || album!!.imageUrls.isEmpty()) {
+                Text(
+                    text = "No pictures found in this album.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(20.dp).align(Alignment.CenterHorizontally)
+                )
+            } else {
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 15.dp, horizontal = 10.dp),
+                    horizontalArrangement = if(isLandscape){
+                        Arrangement.Start
+                    }else{
+                        Arrangement.SpaceEvenly
+                    }
+                ) {
+                    album!!.imageUrls.forEachIndexed { index, image ->
+                        val delay = index * 100
+                        AnimatedVisibility(
+                            visible = visible,
+                            enter = fadeIn(
+                                animationSpec = tween(durationMillis = 500, delayMillis = delay)
+                            ) + scaleIn(
+                                initialScale = 0.8f,
+                                animationSpec = tween(durationMillis = 500, delayMillis = delay)
+                            ),
+                            modifier = Modifier.padding(5.dp)
                         )
+                        {
+                            AsyncImage(
+                                model = image,
+                                contentDescription = "Image",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(120.dp)
+                            )
+                        }
                     }
                 }
             }

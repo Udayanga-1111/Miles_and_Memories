@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -59,10 +60,25 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    //noinspection UseTomlInstead,NewerVersionAvailable
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     var navVersion = "2.9.6"
-    implementation("androidx.navigation:navigation-compose:${navVersion}")
+    implementation("androidx.navigation:navigation-compose:2.9.7")
     //noinspection UseTomlInstead
     implementation("com.google.accompanist:accompanist-flowlayout:0.36.0")
     //noinspection UseTomlInstead,NewerVersionAvailable
-    implementation("com.google.accompanist:accompanist-systemuicontroller:0.30.1")
+    implementation("com.google.accompanist:accompanist-systemuicontroller:0.36.0")
+
+    // Firebase
+    //noinspection GradleDependency,UseTomlInstead
+    implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
+    //noinspection UseTomlInstead
+    implementation("com.google.firebase:firebase-auth:24.0.1")
+    //noinspection UseTomlInstead
+    implementation("com.google.firebase:firebase-firestore:26.1.2")
+    //noinspection UseTomlInstead
+    implementation("com.google.firebase:firebase-storage:22.0.1")
+
+    // Google Login
+    implementation("com.google.android.gms:play-services-auth:21.5.1")
 }

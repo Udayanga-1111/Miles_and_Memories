@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">Miles &amp; Memories</string>
 
+    <string name="default_web_client_id" translatable="false">123907310767-3ohrgbb7mpt4k823jijmcgf9q9t2icfc.apps.googleusercontent.com</string>
+
     <string name="swissalps_title">Swiss Alps</string>
     <string name="swissalps_description">Day three in the Swiss Alps was simply magical. Waking up in Wengen, I was greeted by the majestic, snow-capped peaks of the Eiger, Mönch, and Jungfrau mountains. We took a scenic cogwheel train up to a hiking trail, where wildflowers dotted lush green meadows, and the sound of cowbells filled the fresh mountain air. The views were breathtakingly beautiful, like a scene from a movie. Later, we relaxed by a crystal-clear alpine lake, its tranquil waters reflecting the towering pines. The sheer scale and peacefulness of nature here is awe-inspiring. I can’t believe a place this perfect exists. The friendly locals and delicious Swiss chocolate are just a bonus! Tomorrow, the plan is to explore the Lauterbrunnen Valley and its 72 waterfalls.</string>
     <string name="swissalps_date">12th Dec, 2025</string>

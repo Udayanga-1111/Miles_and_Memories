@@ -45,6 +45,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -68,6 +70,20 @@ import com.example.milesmemories.ui.components.DatePicker
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import com.example.milesmemories.models.Note
+import com.example.milesmemories.models.Album
+import androidx.compose.material3.CircularProgressIndicator
+import kotlin.coroutines.suspendCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import com.google.firebase.storage.StorageReference
+import android.util.Log
 
 @Composable
 fun AddNotePage(
@@ -104,6 +120,13 @@ fun AddNotePage(
     var isRecording by remember { mutableStateOf(false) }
     var mediaRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var currentAudioFile by remember { mutableStateOf<File?>(null) }
+    var fullScreenImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    var isSaving by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val auth = remember { FirebaseAuth.getInstance() }
+    val db = remember { FirebaseFirestore.getInstance() }
+    val storage = remember { FirebaseStorage.getInstance() }
 
     // Image picker launcher
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -169,6 +192,92 @@ fun AddNotePage(
         currentAudioFile = null
     }
 
+    suspend fun uploadFileSafely(ref: StorageReference, uri: Uri): String = suspendCoroutine { continuation ->
+        Log.d("AddNotePage", "Uploading: $uri to ${ref.path}")
+        ref.putFile(uri)
+            .addOnSuccessListener {
+                Log.d("AddNotePage", "Upload success: ${ref.path}")
+                ref.downloadUrl.addOnSuccessListener { downloadUri ->
+                    Log.d("AddNotePage", "Download URL: $downloadUri")
+                    continuation.resume(downloadUri.toString())
+                }.addOnFailureListener { e ->
+                    Log.e("AddNotePage", "Failed to get download URL", e)
+                    continuation.resumeWithException(Exception("Failed to get download URL: ${e.message}"))
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("AddNotePage", "Upload failed", e)
+                continuation.resumeWithException(Exception("Upload failed on Storage: ${e.message}"))
+            }
+    }
+
+    fun saveNote() {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Toast.makeText(context, "You must be logged in to save.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (noteTitle.isBlank() || noteContent.isBlank()) {
+            Toast.makeText(context, "Title and content cannot be empty", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        isSaving = true
+        coroutineScope.launch {
+            try {
+                // 1. Upload Images
+                val uploadedImageUrls = mutableListOf<String>()
+                for (uri in selectedImages) {
+                    val ref = storage.reference.child("images/${currentUser.uid}/${System.currentTimeMillis()}_${uri.lastPathSegment}")
+                    val url = uploadFileSafely(ref, uri)
+                    uploadedImageUrls.add(url)
+                }
+
+                // 2. Upload Audio
+                val uploadedAudioUrls = mutableListOf<String>()
+                for (uri in selectedAudio) {
+                    val ref = storage.reference.child("audio/${currentUser.uid}/${System.currentTimeMillis()}_${uri.lastPathSegment}")
+                    val url = uploadFileSafely(ref, uri)
+                    uploadedAudioUrls.add(url)
+                }
+
+                // 3. Save Note
+                val noteRef = db.collection("notes").document()
+                val newNote = Note(
+                    id = noteRef.id,
+                    userId = currentUser.uid,
+                    title = noteTitle,
+                    content = noteContent,
+                    date = selectedDateMillis ?: System.currentTimeMillis(),
+                    imageUrls = uploadedImageUrls,
+                    voiceUrls = uploadedAudioUrls
+                )
+                noteRef.set(newNote).await()
+
+                // 4. Create Album if images exist
+                if (uploadedImageUrls.isNotEmpty()) {
+                    val albumRef = db.collection("albums").document()
+                    val newAlbum = Album(
+                        id = albumRef.id,
+                        userId = currentUser.uid,
+                        noteId = noteRef.id,
+                        title = noteTitle,
+                        imageUrls = uploadedImageUrls
+                    )
+                    albumRef.set(newAlbum).await()
+                }
+
+                isSaving = false
+                Toast.makeText(context, "Note successfully saved!", Toast.LENGTH_SHORT).show()
+                navController.navigate("home_screen") { popUpTo(0) { inclusive = true } }
+            } catch (e: Exception) {
+                isSaving = false
+                Log.e("AddNotePage", "Error in saveNote", e)
+                Toast.makeText(context, "Error saving: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             Row(
@@ -191,12 +300,19 @@ fun AddNotePage(
                 ) {
                     Discard(navController)
                     Spacer(modifier = Modifier.width(8.dp))
-                    IconButton(onClick = { /* To be Implemented */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Save,
-                            contentDescription = "Save",
-                            tint = MaterialTheme.colorScheme.primary
+                    if (isSaving) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp).padding(end = 8.dp)
                         )
+                    } else {
+                        IconButton(onClick = { saveNote() }) {
+                            Icon(
+                                imageVector = Icons.Default.Save,
+                                contentDescription = "Save",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
@@ -375,7 +491,9 @@ fun AddNotePage(
                                     model = uri,
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clickable { fullScreenImageUri = uri }
                                 )
                                 // Remove button for image
                                 Icon(
@@ -460,6 +578,38 @@ fun AddNotePage(
                         text = "Add Image",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+        }
+    }
+
+    if (fullScreenImageUri != null) {
+        Dialog(
+            onDismissRequest = { fullScreenImageUri = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                AsyncImage(
+                    model = fullScreenImageUri,
+                    contentDescription = "Full Screen Image",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                )
+                IconButton(
+                    onClick = { fullScreenImageUri = null },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close Full Screen",
+                        tint = Color.White
                     )
                 }
             }

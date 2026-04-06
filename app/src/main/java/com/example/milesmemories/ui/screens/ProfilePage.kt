@@ -25,6 +25,10 @@ import androidx.navigation.NavController
 import com.example.milesmemories.R
 import com.example.milesmemories.ui.components.NavigationBar
 import com.example.milesmemories.ui.components.TitleHeader
+import com.google.firebase.auth.FirebaseAuth
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.size
+import coil.compose.AsyncImage
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.width
@@ -51,6 +55,8 @@ fun ProfilePage(
     isDarkTheme: Boolean,
     onThemeChange: (Boolean) -> Unit
 ) {
+    val auth = remember { FirebaseAuth.getInstance() }
+    val currentUser = auth.currentUser
 
     Scaffold(
         topBar = {
@@ -81,20 +87,41 @@ fun ProfilePage(
                         .padding(5.dp)
                         .fillMaxWidth()
                 ) {
-                    Image(
-                        painter = painterResource(R.drawable.profile_pic),
-                        contentDescription = "Profile picture",
-                        modifier = Modifier.clip(RoundedCornerShape(200.dp))
-                    )
+                    if (currentUser?.photoUrl != null) {
+                        AsyncImage(
+                            model = currentUser.photoUrl,
+                            contentDescription = "Profile picture",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(RoundedCornerShape(60.dp))
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(R.drawable.profile_pic),
+                            contentDescription = "Profile picture",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(RoundedCornerShape(60.dp))
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Udayanga Dilshan",
+                        text = currentUser?.displayName ?: "Adventure Awaits!",
                         style = MaterialTheme.typography.bodyLarge,
                         fontSize = 30.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    if (currentUser?.email != null) {
+                        Text(
+                            text = currentUser.email!!,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(30.dp))
@@ -181,6 +208,7 @@ fun SettingItem(icon: androidx.compose.ui.graphics.vector.ImageVector, text: Str
 @Composable
 fun LogOut(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, navController: NavController) {
     var showDialog by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Row(
         modifier = Modifier
@@ -204,8 +232,15 @@ fun LogOut(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, 
     ConfirmLogout(
         showDialog,
         onDismiss = { showDialog = false },
-        onConfirm = { showDialog = false
-            navController.navigate("login_page"){ popUpTo(0) { inclusive = true }  } })
+        onConfirm = { 
+            showDialog = false
+            FirebaseAuth.getInstance().signOut()
+            com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(
+                context, 
+                com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+            ).signOut()
+            navController.navigate("login_page"){ popUpTo(0) { inclusive = true }  } 
+        })
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 

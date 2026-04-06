@@ -16,19 +16,55 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.milesmemories.data.CardList
 import com.example.milesmemories.ui.components.FAB
 import com.example.milesmemories.ui.components.Header
-import com.example.milesmemories.ui.components.LandscapeCard
 import com.example.milesmemories.ui.components.NavigationBar
-import com.example.milesmemories.ui.components.PortraitCard
+import com.example.milesmemories.ui.components.DynamicLandscapeCard
+import com.example.milesmemories.ui.components.DynamicPortraitCard
 import com.example.milesmemories.ui.components.SearchBar
+import com.example.milesmemories.models.Note
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import androidx.compose.runtime.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import android.util.Log
+import androidx.compose.material3.CircularProgressIndicator
 import com.example.milesmemories.ui.components.TitleHeader
 
 @Composable
 fun HomePage(navController: NavController) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    
+    val notes = remember { mutableStateListOf<Note>() }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId != null) {
+            FirebaseFirestore.getInstance().collection("notes")
+                .whereEqualTo("userId", userId)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        Log.e("HomePage", "Listen failed.", error)
+                        isLoading = false
+                        return@addSnapshotListener
+                    }
+                    if (snapshot != null) {
+                        notes.clear()
+                        for (doc in snapshot.documents) {
+                            val note = doc.toObject(Note::class.java)
+                            if (note != null) notes.add(note)
+                        }
+                    }
+                    isLoading = false
+                }
+        } else {
+            isLoading = false
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -39,7 +75,7 @@ fun HomePage(navController: NavController) {
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { navController.navigate("add_note_page/New Note///Select Date")},
+                onClick = { navController.navigate("add_note_page/New Note?title=&description=&date=Select Date")},
                 containerColor = MaterialTheme.colorScheme.primary,
             ) {
                 FAB()
@@ -62,34 +98,52 @@ fun HomePage(navController: NavController) {
             ) {
                 item {
                     if (isLandscape) {
-                        Header("Journeys", "${CardList.cardList.count()}")
+                        Header("Journeys", "${notes.size}")
                         Spacer(modifier = Modifier.height(10.dp))
                     } else {
-                        Header("Journeys", "${CardList.cardList.count()}")
+                        Header("Journeys", "${notes.size}")
                         Spacer(modifier = Modifier.height(10.dp))
                         SearchBar()
                         Spacer(modifier = Modifier.height(10.dp))
                     }
                 }
 
-                CardList.cardList.forEach { card ->
+                if (isLoading) {
                     item {
-                        if (isLandscape) {
-                            LandscapeCard(
-                                title = card.title,
-                                description = card.description,
-                                date = card.date,
-                                coverImage = card.coverImage,
-                                {navController.navigate("note_details_page/${card.title}/${card.description}/${card.date}/${card.coverImage}")}
-                            )
-                        }else{
-                            PortraitCard(
-                                title = card.title,
-                                description = card.description,
-                                date = card.date,
-                                coverImage = card.coverImage,
-                                {navController.navigate("note_details_page/${card.title}/${card.description}/${card.date}/${card.coverImage}")}
-                            )
+                        CircularProgressIndicator(modifier = Modifier.padding(20.dp))
+                    }
+                } else if (notes.isEmpty()) {
+                    item {
+                        androidx.compose.material3.Text(
+                            text = "No journeys yet. Tap the + button to add one!",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(20.dp)
+                        )
+                    }
+                } else {
+                    notes.forEach { note ->
+                        item {
+                            val dateString = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(note.date))
+                            val coverImageUrl = if (note.imageUrls.isNotEmpty()) note.imageUrls.first() else null
+                            val navRoute = "note_details_page/${note.id}"
+                            
+                            if (isLandscape) {
+                                DynamicLandscapeCard(
+                                    title = note.title,
+                                    description = note.content,
+                                    date = dateString,
+                                    coverImage = coverImageUrl,
+                                    onClick = { navController.navigate(navRoute) }
+                                )
+                            }else{
+                                DynamicPortraitCard(
+                                    title = note.title,
+                                    description = note.content,
+                                    date = dateString,
+                                    coverImage = coverImageUrl,
+                                    onClick = { navController.navigate(navRoute) }
+                                )
+                            }
                         }
                     }
                 }
