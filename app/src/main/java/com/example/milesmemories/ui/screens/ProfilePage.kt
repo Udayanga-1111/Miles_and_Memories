@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun ProfilePage(
@@ -57,6 +58,33 @@ fun ProfilePage(
 ) {
     val auth = remember { FirebaseAuth.getInstance() }
     val currentUser = auth.currentUser
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    var displayName by remember { mutableStateOf<String?>("Adventure Awaits!") }
+    var email by remember { mutableStateOf<String?>(null) }
+    var photoUrl by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        val cachedProfile = com.example.milesmemories.utils.OfflineProfileManager.loadProfileData(context)
+        if (cachedProfile != null) {
+            displayName = cachedProfile.name ?: "Adventure Awaits!"
+            email = cachedProfile.email
+            photoUrl = cachedProfile.photoUrl
+        }
+        
+        if (currentUser != null) {
+            displayName = currentUser.displayName
+            email = currentUser.email
+            photoUrl = currentUser.photoUrl?.toString()
+            
+            com.example.milesmemories.utils.OfflineProfileManager.saveProfileData(
+                context, 
+                currentUser.displayName, 
+                currentUser.email, 
+                currentUser.photoUrl?.toString()
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -87,9 +115,9 @@ fun ProfilePage(
                         .padding(5.dp)
                         .fillMaxWidth()
                 ) {
-                    if (currentUser?.photoUrl != null) {
+                    if (photoUrl != null) {
                         AsyncImage(
-                            model = currentUser.photoUrl,
+                            model = photoUrl,
                             contentDescription = "Profile picture",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
@@ -110,14 +138,14 @@ fun ProfilePage(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = currentUser?.displayName ?: "Adventure Awaits!",
+                        text = displayName ?: "Adventure Awaits!",
                         style = MaterialTheme.typography.bodyLarge,
                         fontSize = 30.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    if (currentUser?.email != null) {
+                    if (email != null) {
                         Text(
-                            text = currentUser.email!!,
+                            text = email!!,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -170,10 +198,12 @@ fun ProfilePage(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                     // Other Settings
-                    SettingItem(icon = Icons.Default.Person, text = "Account")
-                    SettingItem(icon = Icons.Default.Notifications, text = "Notifications")
-                    SettingItem(icon = Icons.Default.Lock, text = "Privacy & Security")
-                    SettingItem(icon = Icons.Default.Info, text = "About")
+                    SettingItem(icon = Icons.Default.Person, text = "Account") {}
+                    SettingItem(icon = Icons.Default.Notifications, text = "Notifications") {}
+                    SettingItem(icon = Icons.Default.Lock, text = "Privacy & Security") {
+                        navController.navigate("security_page")
+                    }
+                    SettingItem(icon = Icons.Default.Info, text = "About") {}
                     LogOut(icon = Icons.Default.Logout, text = "Log Out", navController)
                 }
             }
@@ -182,11 +212,11 @@ fun ProfilePage(
 }
 
 @Composable
-fun SettingItem(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+fun SettingItem(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }
+            .clickable { onClick() }
             .padding(vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -234,6 +264,7 @@ fun LogOut(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, 
         onDismiss = { showDialog = false },
         onConfirm = { 
             showDialog = false
+            com.example.milesmemories.utils.OfflineProfileManager.clearProfileData(context)
             FirebaseAuth.getInstance().signOut()
             com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(
                 context, 

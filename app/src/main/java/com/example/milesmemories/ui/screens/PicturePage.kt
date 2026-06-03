@@ -5,21 +5,31 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,7 +46,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,6 +74,8 @@ fun PicturePage(
     var visible by remember { mutableStateOf(false) }
     var album by remember { mutableStateOf<Album?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    var showFullScreenViewer by remember { mutableStateOf(false) }
+    var initialImageIndex by remember { mutableStateOf(0) }
 
     LaunchedEffect(title) {
         visible = true
@@ -127,11 +142,7 @@ fun PicturePage(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 15.dp, horizontal = 10.dp),
-                    horizontalArrangement = if(isLandscape){
-                        Arrangement.Start
-                    }else{
-                        Arrangement.SpaceEvenly
-                    }
+                    horizontalArrangement = Arrangement.Start
                 ) {
                     album!!.imageUrls.forEachIndexed { index, image ->
                         val delay = index * 100
@@ -152,9 +163,54 @@ fun PicturePage(
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .size(120.dp)
+                                    .clickable {
+                                        initialImageIndex = index
+                                        showFullScreenViewer = true
+                                    }
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+
+    if (showFullScreenViewer && album != null) {
+        val pagerState = rememberPagerState(initialPage = initialImageIndex) {
+            album!!.imageUrls.size
+        }
+        Dialog(
+            onDismissRequest = { showFullScreenViewer = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = true)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    AsyncImage(
+                        model = album!!.imageUrls[page],
+                        contentDescription = "Full Screen Image",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                
+                IconButton(
+                    onClick = { showFullScreenViewer = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.White
+                    )
                 }
             }
         }

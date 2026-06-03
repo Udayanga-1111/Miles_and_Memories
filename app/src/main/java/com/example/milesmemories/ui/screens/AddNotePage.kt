@@ -29,13 +29,24 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
+import android.content.Intent
+import android.content.ActivityNotFoundException
+import com.google.android.gms.location.LocationServices
+import androidx.compose.runtime.collectAsState
+import com.example.milesmemories.utils.SharedLocationManager
+import android.annotation.SuppressLint
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -72,34 +83,41 @@ import java.util.Date
 import java.util.Locale
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import android.location.Geocoder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.example.milesmemories.models.Note
 import com.example.milesmemories.models.Album
 import androidx.compose.material3.CircularProgressIndicator
 import kotlin.coroutines.suspendCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import com.google.firebase.storage.StorageReference
 import android.util.Log
+import androidx.compose.runtime.LaunchedEffect
+import com.cloudinary.android.MediaManager
+import com.cloudinary.android.callback.ErrorInfo
+import com.cloudinary.android.callback.UploadCallback
+import org.osmdroid.config.Configuration as OsmConfig
+import org.osmdroid.views.MapView
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.views.overlay.Marker
+import androidx.compose.ui.viewinterop.AndroidView
 
 @Composable
 fun AddNotePage(
     navController: NavController,
     page: String,
-    title: String?,
-    description: String?,
-    date: String?
+    noteId: String?
 ) {
-    var noteTitle by remember {
-        mutableStateOf(title ?: "")
-    }
-
-    var noteContent by remember {
-        mutableStateOf(description ?: "")
-    }
+    var noteTitle by remember { mutableStateOf("") }
+    var noteContent by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
+    var showMapPicker by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -108,14 +126,20 @@ fun AddNotePage(
     var selectedDateMillis by remember { mutableStateOf<Long?>(System.currentTimeMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
     
-    var dateString = date ?: remember(selectedDateMillis) {
+    var dateString = remember(selectedDateMillis) {
         selectedDateMillis?.let {
             SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(it))
         } ?: "Select Date"
     }
 
+    val existingImageUrls = remember { mutableStateListOf<String>() }
+    val existingAudioUrls = remember { mutableStateListOf<String>() }
+    val existingAudioNames = remember { mutableStateListOf<String>() }
+    var originalNote by remember { mutableStateOf<Note?>(null) }
+
     val selectedImages = remember { mutableStateListOf<Uri>() }
     val selectedAudio = remember { mutableStateListOf<Uri>() }
+    val selectedAudioNames = remember { mutableStateListOf<String>() }
     
     var isRecording by remember { mutableStateOf(false) }
     var mediaRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
@@ -126,7 +150,95 @@ fun AddNotePage(
     val coroutineScope = rememberCoroutineScope()
     val auth = remember { FirebaseAuth.getInstance() }
     val db = remember { FirebaseFirestore.getInstance() }
-    val storage = remember { FirebaseStorage.getInstance() }
+    
+    LaunchedEffect(noteId) {
+        if (!noteId.isNullOrEmpty()) {
+            db.collection("notes").document(noteId).get()
+                .addOnSuccessListener { document ->
+                    val n = document.toObject(Note::class.java)
+                    if (n != null) {
+                        originalNote = n
+                        noteTitle = n.title
+                        noteContent = n.content
+                        location = n.location
+                        selectedDateMillis = n.date
+                        
+                        existingImageUrls.addAll(n.imageUrls)
+                        existingAudioUrls.addAll(n.voiceUrls)
+                        
+                        val names = n.voiceNames.toMutableList()
+                        while (names.size < n.voiceUrls.size) {
+                            names.add("Journey Audio Note ${names.size + 1}")
+                        }
+                        existingAudioNames.addAll(names)
+                    }
+                }
+        }
+    }
+
+    // Shared Location Observer
+    val pendingLoc by SharedLocationManager.pendingLocation.collectAsState()
+    LaunchedEffect(pendingLoc) {
+        if (pendingLoc != null) {
+            location = pendingLoc!!
+            SharedLocationManager.pendingLocation.value = null
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun fetchCurrentLocation() {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+        fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
+            if (loc != null) {
+                coroutineScope.launch(Dispatchers.IO) {
+                    try {
+                        val geocoder = Geocoder(context, Locale.getDefault())
+                        val addresses = geocoder.getFromLocation(loc.latitude, loc.longitude, 1)
+                        val addressName = if (!addresses.isNullOrEmpty()) {
+                            val addr = addresses[0]
+                            val feature = addr.featureName
+                            val city = addr.locality ?: addr.subAdminArea ?: addr.adminArea
+                            val isNumeric = feature?.matches(Regex("\\d+[a-zA-Z]*(-?\\d+[a-zA-Z]*)?")) == true
+                            if (!feature.isNullOrBlank() && !isNumeric && feature != city) {
+                                if (!city.isNullOrBlank()) "$feature, $city" else feature
+                            } else if (!city.isNullOrBlank()) {
+                                city
+                            } else {
+                                addr.getAddressLine(0) ?: "${loc.latitude},${loc.longitude}"
+                            }
+                        } else {
+                            "${loc.latitude},${loc.longitude}"
+                        }
+                        withContext(Dispatchers.Main) {
+                            location = addressName
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            location = "${loc.latitude},${loc.longitude}"
+                            Toast.makeText(context, "Could not get address name.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            } else {
+                Toast.makeText(context, "Location not found. Ensure location is enabled.", Toast.LENGTH_SHORT).show()
+            }
+        }.addOnFailureListener {
+            Toast.makeText(context, "Failed to get location.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { permissions ->
+            val fineLocationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+            val coarseLocationGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+            if (fineLocationGranted || coarseLocationGranted) {
+                fetchCurrentLocation()
+            } else {
+                Toast.makeText(context, "Location permission denied.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    )
 
     // Image picker launcher
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -178,37 +290,69 @@ fun AddNotePage(
     }
 
     fun stopRecording() {
+        var recordingSuccessful = true
         try {
             mediaRecorder?.stop()
-            mediaRecorder?.release()
         } catch(e: Exception) {
             e.printStackTrace()
+            recordingSuccessful = false
+            Toast.makeText(context, "Recording was too short to save.", Toast.LENGTH_SHORT).show()
+        } finally {
+            try {
+                mediaRecorder?.release()
+            } catch (e: Exception) {}
         }
+        
         mediaRecorder = null
         isRecording = false
-        currentAudioFile?.let {
-            selectedAudio.add(Uri.fromFile(it))
+        
+        if (recordingSuccessful) {
+            currentAudioFile?.let {
+                if (it.exists() && it.length() > 0) {
+                    val newUri = Uri.fromFile(it)
+                    selectedAudio.add(newUri)
+                    selectedAudioNames.add("New Voice Record")
+                } else {
+                    Toast.makeText(context, "Failed to save audio file.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        } else {
+            currentAudioFile?.delete()
         }
         currentAudioFile = null
     }
 
-    suspend fun uploadFileSafely(ref: StorageReference, uri: Uri): String = suspendCoroutine { continuation ->
-        Log.d("AddNotePage", "Uploading: $uri to ${ref.path}")
-        ref.putFile(uri)
-            .addOnSuccessListener {
-                Log.d("AddNotePage", "Upload success: ${ref.path}")
-                ref.downloadUrl.addOnSuccessListener { downloadUri ->
-                    Log.d("AddNotePage", "Download URL: $downloadUri")
-                    continuation.resume(downloadUri.toString())
-                }.addOnFailureListener { e ->
-                    Log.e("AddNotePage", "Failed to get download URL", e)
-                    continuation.resumeWithException(Exception("Failed to get download URL: ${e.message}"))
-                }
-            }
-            .addOnFailureListener { e ->
-                Log.e("AddNotePage", "Upload failed", e)
-                continuation.resumeWithException(Exception("Upload failed on Storage: ${e.message}"))
-            }
+    suspend fun uploadToCloudinarySafely(uri: Uri, isAudio: Boolean): String = suspendCoroutine { continuation ->
+        try {
+            val resourceType = if (isAudio) "video" else "image"
+            
+            MediaManager.get().upload(uri)
+                .option("resource_type", resourceType) // Important for .3gp audio
+                .callback(object : UploadCallback {
+                    override fun onStart(requestId: String) {
+                        Log.d("AddNotePage", "Cloudinary upload started: $uri")
+                    }
+                    override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {}
+                    override fun onSuccess(requestId: String, resultData: Map<*, *>) {
+                        val secureUrl = resultData["secure_url"] as String?
+                        if (secureUrl != null) {
+                            Log.d("AddNotePage", "Cloudinary upload success: $secureUrl")
+                            continuation.resume(secureUrl)
+                        } else {
+                            continuation.resumeWithException(Exception("Empty secure_url returned"))
+                        }
+                    }
+                    override fun onError(requestId: String, error: ErrorInfo) {
+                        Log.e("AddNotePage", "Cloudinary Upload failed: ${error.description}")
+                        continuation.resumeWithException(Exception("Cloudinary Error: ${error.description}"))
+                    }
+                    override fun onReschedule(requestId: String, error: ErrorInfo) {}
+                })
+                .dispatch()
+        } catch (e: Exception) {
+            Log.e("AddNotePage", "Cloudinary local setup error", e)
+            continuation.resumeWithException(Exception("Could not start upload: ${e.message}"))
+        }
     }
 
     fun saveNote() {
@@ -228,49 +372,76 @@ fun AddNotePage(
                 // 1. Upload Images
                 val uploadedImageUrls = mutableListOf<String>()
                 for (uri in selectedImages) {
-                    val ref = storage.reference.child("images/${currentUser.uid}/${System.currentTimeMillis()}_${uri.lastPathSegment}")
-                    val url = uploadFileSafely(ref, uri)
+                    val url = uploadToCloudinarySafely(uri, false)
                     uploadedImageUrls.add(url)
                 }
 
                 // 2. Upload Audio
                 val uploadedAudioUrls = mutableListOf<String>()
                 for (uri in selectedAudio) {
-                    val ref = storage.reference.child("audio/${currentUser.uid}/${System.currentTimeMillis()}_${uri.lastPathSegment}")
-                    val url = uploadFileSafely(ref, uri)
+                    val url = uploadToCloudinarySafely(uri, true)
                     uploadedAudioUrls.add(url)
                 }
 
                 // 3. Save Note
-                val noteRef = db.collection("notes").document()
+                val noteRef = if (noteId.isNullOrEmpty()) {
+                    db.collection("notes").document()
+                } else {
+                    db.collection("notes").document(noteId)
+                }
+
+                val finalImageUrls = existingImageUrls + uploadedImageUrls
+                val finalVoiceUrls = existingAudioUrls + uploadedAudioUrls
+                val finalVoiceNames = existingAudioNames + selectedAudioNames
+                
                 val newNote = Note(
                     id = noteRef.id,
                     userId = currentUser.uid,
                     title = noteTitle,
                     content = noteContent,
+                    location = location,
                     date = selectedDateMillis ?: System.currentTimeMillis(),
-                    imageUrls = uploadedImageUrls,
-                    voiceUrls = uploadedAudioUrls
+                    imageUrls = finalImageUrls,
+                    voiceUrls = finalVoiceUrls,
+                    voiceNames = finalVoiceNames,
+                    isFavorite = originalNote?.isFavorite ?: false
                 )
-                noteRef.set(newNote).await()
+                noteRef.set(newNote) // Overwrites note while keeping favorite status and id intact
 
-                // 4. Create Album if images exist
-                if (uploadedImageUrls.isNotEmpty()) {
-                    val albumRef = db.collection("albums").document()
-                    val newAlbum = Album(
-                        id = albumRef.id,
-                        userId = currentUser.uid,
-                        noteId = noteRef.id,
-                        title = noteTitle,
-                        imageUrls = uploadedImageUrls
-                    )
-                    albumRef.set(newAlbum).await()
+                // 4. Create or Update Album if images exist
+                if (finalImageUrls.isNotEmpty()) {
+                    val albumSnapshot = db.collection("albums").whereEqualTo("noteId", noteRef.id).get().await()
+                    if (!albumSnapshot.isEmpty) {
+                        val albumDoc = albumSnapshot.documents[0]
+                        db.collection("albums").document(albumDoc.id).update(
+                            mapOf(
+                                "title" to noteTitle,
+                                "imageUrls" to finalImageUrls
+                            )
+                        )
+                    } else {
+                        val albumRef = db.collection("albums").document()
+                        val newAlbum = Album(
+                            id = albumRef.id,
+                            userId = currentUser.uid,
+                            noteId = noteRef.id,
+                            title = noteTitle,
+                            imageUrls = finalImageUrls
+                        )
+                        albumRef.set(newAlbum)
+                    }
+                } else {
+                    val albumSnapshot = db.collection("albums").whereEqualTo("noteId", noteRef.id).get().await()
+                    for (doc in albumSnapshot.documents) {
+                        db.collection("albums").document(doc.id).delete()
+                    }
                 }
 
                 isSaving = false
                 Toast.makeText(context, "Note successfully saved!", Toast.LENGTH_SHORT).show()
                 navController.navigate("home_screen") { popUpTo(0) { inclusive = true } }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 isSaving = false
                 Log.e("AddNotePage", "Error in saveNote", e)
                 Toast.makeText(context, "Error saving: ${e.message}", Toast.LENGTH_LONG).show()
@@ -386,6 +557,71 @@ fun AddNotePage(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Location Picker
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp, horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = "Location",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                if (location.isNotBlank()) {
+                    Text(
+                        text = location,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                showMapPicker = true
+                            }
+                            .padding(vertical = 8.dp)
+                    )
+                } else {
+                    Text(
+                        text = "Location: Not Set",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(vertical = 8.dp)
+                    )
+                }
+                
+                // Fetch Location Button
+                IconButton(onClick = {
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        fetchCurrentLocation()
+                    } else {
+                        locationPermissionLauncher.launch(
+                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                        )
+                    }
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.MyLocation,
+                        contentDescription = "Get Current Location",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                // Open Maps Button
+                IconButton(onClick = { showMapPicker = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Map,
+                        contentDescription = "Open in Maps",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             // Note Content Input
             TextField(
                 value = noteContent,
@@ -416,7 +652,7 @@ fun AddNotePage(
                     .padding(bottom = 16.dp)
             ) {
                 // Selected Audio list
-                if (selectedAudio.isNotEmpty()) {
+                if (selectedAudio.isNotEmpty() || existingAudioUrls.isNotEmpty()) {
                     Text(
                         text = "Voice Records",
                         style = MaterialTheme.typography.titleMedium,
@@ -430,7 +666,7 @@ fun AddNotePage(
                             .padding(bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        selectedAudio.forEach { uri ->
+                        existingAudioUrls.forEachIndexed { index, url ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -441,15 +677,21 @@ fun AddNotePage(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Mic,
-                                    contentDescription = "Audio Item",
+                                    contentDescription = "Existing Audio Item",
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Voice Record added",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                TextField(
+                                    value = existingAudioNames[index],
+                                    onValueChange = { existingAudioNames[index] = it },
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent
+                                    ),
+                                    textStyle = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Icon(
@@ -458,7 +700,52 @@ fun AddNotePage(
                                     tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier
                                         .size(20.dp)
-                                        .clickable { selectedAudio.remove(uri) }
+                                        .clickable { 
+                                            existingAudioUrls.removeAt(index)
+                                            existingAudioNames.removeAt(index)
+                                        }
+                                )
+                            }
+                        }
+
+                        selectedAudio.forEachIndexed { index, uri ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Mic,
+                                    contentDescription = "New Audio Item",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                TextField(
+                                    value = selectedAudioNames[index],
+                                    onValueChange = { selectedAudioNames[index] = it },
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent
+                                    ),
+                                    textStyle = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove Audio",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { 
+                                            selectedAudio.removeAt(index)
+                                            selectedAudioNames.removeAt(index)
+                                        }
                                 )
                             }
                         }
@@ -466,7 +753,7 @@ fun AddNotePage(
                 }
 
                 // Selected Images list
-                if (selectedImages.isNotEmpty()) {
+                if (selectedImages.isNotEmpty() || existingImageUrls.isNotEmpty()) {
                     Text(
                         text = "Images",
                         style = MaterialTheme.typography.titleMedium,
@@ -480,6 +767,37 @@ fun AddNotePage(
                             .fillMaxWidth()
                             .height(100.dp)
                     ) {
+                        items(existingImageUrls) { url ->
+                            Box(
+                                modifier = Modifier
+                                    .size(100.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                AsyncImage(
+                                    model = url,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove Existing Image",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(4.dp)
+                                        .size(20.dp)
+                                        .background(
+                                            Color.Black.copy(alpha = 0.5f),
+                                            RoundedCornerShape(50)
+                                        )
+                                        .padding(2.dp)
+                                        .clickable { existingImageUrls.remove(url) }
+                                )
+                            }
+                        }
+
                         items(selectedImages) { uri ->
                             Box(
                                 modifier = Modifier
@@ -611,6 +929,244 @@ fun AddNotePage(
                         contentDescription = "Close Full Screen",
                         tint = Color.White
                     )
+                }
+            }
+        }
+    }
+
+    if (showMapPicker) {
+        var mapMarkerLocation by remember { mutableStateOf<GeoPoint?>(null) }
+        
+        Dialog(
+            onDismissRequest = { showMapPicker = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Top Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Pick Location",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        IconButton(onClick = { showMapPicker = false }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+
+                    // Search Bar
+                    var mapSearchQuery by remember { mutableStateOf("") }
+                    var isSearchingLocation by remember { mutableStateOf(false) }
+                    var mapViewRef by remember { mutableStateOf<MapView?>(null) }
+                    var mapMarkerRef by remember { mutableStateOf<Marker?>(null) }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextField(
+                            value = mapSearchQuery,
+                            onValueChange = { mapSearchQuery = it },
+                            placeholder = { Text("Search location...") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = {
+                                if (mapSearchQuery.isNotBlank()) {
+                                    isSearchingLocation = true
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        try {
+                                            val geocoder = Geocoder(context, Locale.getDefault())
+                                            val results = geocoder.getFromLocationName(mapSearchQuery, 1)
+                                            if (!results.isNullOrEmpty()) {
+                                                val result = results[0]
+                                                val point = GeoPoint(result.latitude, result.longitude)
+                                                withContext(Dispatchers.Main) {
+                                                    mapMarkerLocation = point
+                                                    mapViewRef?.controller?.animateTo(point)
+                                                    mapMarkerRef?.position = point
+                                                    mapViewRef?.invalidate()
+                                                    isSearchingLocation = false
+                                                }
+                                            } else {
+                                                withContext(Dispatchers.Main) {
+                                                    isSearchingLocation = false
+                                                    Toast.makeText(context, "Location not found", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            withContext(Dispatchers.Main) {
+                                                isSearchingLocation = false
+                                                Toast.makeText(context, "Search failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                }
+                            }),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = {
+                                if (mapSearchQuery.isNotBlank()) {
+                                    isSearchingLocation = true
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        try {
+                                            val geocoder = Geocoder(context, Locale.getDefault())
+                                            val results = geocoder.getFromLocationName(mapSearchQuery, 1)
+                                            if (!results.isNullOrEmpty()) {
+                                                val result = results[0]
+                                                val point = GeoPoint(result.latitude, result.longitude)
+                                                withContext(Dispatchers.Main) {
+                                                    mapMarkerLocation = point
+                                                    mapViewRef?.controller?.animateTo(point)
+                                                    mapMarkerRef?.position = point
+                                                    mapViewRef?.invalidate()
+                                                    isSearchingLocation = false
+                                                }
+                                            } else {
+                                                withContext(Dispatchers.Main) {
+                                                    isSearchingLocation = false
+                                                    Toast.makeText(context, "Location not found", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            withContext(Dispatchers.Main) {
+                                                isSearchingLocation = false
+                                                Toast.makeText(context, "Search failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                        ) {
+                            if (isSearchingLocation) {
+                                CircularProgressIndicator(
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            } else {
+                                Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onPrimary)
+                            }
+                        }
+                    }
+
+                    // MapView
+                    AndroidView(
+                        factory = { ctx ->
+                            OsmConfig.getInstance().userAgentValue = ctx.packageName
+                            val mapView = MapView(ctx)
+                            mapView.setMultiTouchControls(true)
+                            mapView.controller.setZoom(15.0)
+
+                            // Initial position (use current location if set, else center of world)
+                            val startPoint = if (location.isNotBlank() && location.contains(",")) {
+                                val parts = location.split(",")
+                                val lat = parts[0].trim().toDoubleOrNull()
+                                val lng = parts[1].trim().toDoubleOrNull()
+                                if (lat != null && lng != null) {
+                                    GeoPoint(lat, lng)
+                                } else {
+                                    GeoPoint(6.9271, 79.8612) // Default to Colombo
+                                }
+                            } else {
+                                GeoPoint(6.9271, 79.8612)
+                            }
+                            mapView.controller.setCenter(startPoint)
+
+                            val marker = Marker(mapView)
+                            marker.position = startPoint
+                            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            mapView.overlays.add(marker)
+                            mapMarkerLocation = startPoint
+                            mapMarkerRef = marker
+                            mapViewRef = mapView
+
+                            val receive = object : MapEventsReceiver {
+                                override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
+                                    p?.let {
+                                        marker.position = it
+                                        mapMarkerLocation = it
+                                        mapView.invalidate()
+                                    }
+                                    return true
+                                }
+                                override fun longPressHelper(p: GeoPoint?): Boolean = false
+                            }
+                            mapView.overlays.add(MapEventsOverlay(receive))
+
+                            mapView
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Confirm Button
+                    TextButton(
+                        onClick = {
+                            mapMarkerLocation?.let { geoPoint ->
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    try {
+                                        val geocoder = Geocoder(context, Locale.getDefault())
+                                        val addresses = geocoder.getFromLocation(geoPoint.latitude, geoPoint.longitude, 1)
+                                        val addressName = if (!addresses.isNullOrEmpty()) {
+                                            val addr = addresses[0]
+                                            val feature = addr.featureName
+                                            val city = addr.locality ?: addr.subAdminArea ?: addr.adminArea
+                                            val isNumeric = feature?.matches(Regex("\\d+[a-zA-Z]*(-?\\d+[a-zA-Z]*)?")) == true
+                                            if (!feature.isNullOrBlank() && !isNumeric && feature != city) {
+                                                if (!city.isNullOrBlank()) "$feature, $city" else feature
+                                            } else if (!city.isNullOrBlank()) {
+                                                city
+                                            } else {
+                                                addr.getAddressLine(0) ?: "${geoPoint.latitude},${geoPoint.longitude}"
+                                            }
+                                        } else {
+                                            "${geoPoint.latitude},${geoPoint.longitude}"
+                                        }
+                                        withContext(Dispatchers.Main) {
+                                            location = addressName
+                                            showMapPicker = false
+                                        }
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            location = "${geoPoint.latitude},${geoPoint.longitude}"
+                                            showMapPicker = false
+                                        }
+                                    }
+                                }
+                            } ?: run {
+                                showMapPicker = false
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                    ) {
+                        Text("Confirm Location", color = MaterialTheme.colorScheme.onPrimary)
+                    }
                 }
             }
         }

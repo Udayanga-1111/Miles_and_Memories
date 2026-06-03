@@ -1,6 +1,7 @@
 package com.example.milesmemories.ui.screens
 
 import android.content.res.Configuration
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -8,32 +9,77 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.milesmemories.data.CardList
-import com.example.milesmemories.ui.components.FAB
+import com.example.milesmemories.models.Note
+import com.example.milesmemories.ui.components.DynamicLandscapeCard
+import com.example.milesmemories.ui.components.DynamicPortraitCard
 import com.example.milesmemories.ui.components.Header
-import com.example.milesmemories.ui.components.LandscapeCard
 import com.example.milesmemories.ui.components.NavigationBar
-import com.example.milesmemories.ui.components.PortraitCard
 import com.example.milesmemories.ui.components.SearchBar
 import com.example.milesmemories.ui.components.TitleHeader
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun FavoritePage(navController: NavController){
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    val notes = remember { mutableStateListOf<Note>() }
+    var isLoading by remember { mutableStateOf(true) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId != null) {
+            FirebaseFirestore.getInstance().collection("notes")
+                .whereEqualTo("userId", userId)
+                .whereEqualTo("isFavorite", true)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        Log.e("FavoritePage", "Listen failed.", error)
+                        isLoading = false
+                        return@addSnapshotListener
+                    }
+                    if (snapshot != null) {
+                        notes.clear()
+                        for (doc in snapshot.documents) {
+                            val note = doc.toObject(Note::class.java)
+                            if (note != null) notes.add(note)
+                        }
+                    }
+                    isLoading = false
+                }
+        } else {
+            isLoading = false
+        }
+    }
+
     Scaffold(
         topBar = {
-            TitleHeader(true)
+            TitleHeader(
+                searchBar = true,
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it }
+            )
         },
         bottomBar = {
             NavigationBar(navController = navController)
@@ -53,39 +99,87 @@ fun FavoritePage(navController: NavController){
             ) {
                 item {
                     if (isLandscape) {
-                        Header("Favorites", "${CardList.favList.count()}")
+                        Header("Favorites", "${notes.size}")
                         Spacer(modifier = Modifier.height(10.dp))
                     } else {
-                        Header("Favorites", "${CardList.favList.count()}")
+                        Header("Favorites", "${notes.size}")
                         Spacer(modifier = Modifier.height(10.dp))
-                        SearchBar()
+                        SearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
                         Spacer(modifier = Modifier.height(10.dp))
                     }
                 }
 
-                CardList.favList.forEach { card ->
+                val filteredNotes = if (searchQuery.isBlank()) notes else notes.filter { 
+                    it.title.contains(searchQuery, ignoreCase = true) || 
+                    it.content.contains(searchQuery, ignoreCase = true) 
+                }
+
+                if (isLoading) {
                     item {
-                        if (isLandscape) {
-                            LandscapeCard(
-                                title = card.title,
-                                description = card.description,
-                                date = card.date,
-                                coverImage = card.coverImage,
-                                {navController.navigate("note_details_page/${card.title}/${card.description}/${card.date}/${card.coverImage}")}
-                            )
-                        }else{
-                            PortraitCard(
-                                title = card.title,
-                                description = card.description,
-                                date = card.date,
-                                coverImage = card.coverImage,
-                                {navController.navigate("note_details_page/${card.title}/${card.description}/${card.date}/${card.coverImage}")}
-                            )
+                        CircularProgressIndicator(modifier = Modifier.padding(20.dp))
+                    }
+                } else if (notes.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No favorite journeys yet.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(20.dp)
+                        )
+                    }
+                } else if (filteredNotes.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No favorite journeys match your search.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(20.dp)
+                        )
+                    }
+                } else {
+                    filteredNotes.forEach { note ->
+                        item {
+                            val dateString = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(note.date))
+                            val coverImageUrl = if (note.imageUrls.isNotEmpty()) note.imageUrls.first() else null
+                            val navRoute = "note_details_page/${note.id}"
+                            
+                            if (isLandscape) {
+                                DynamicLandscapeCard(
+                                    title = note.title,
+                                    description = note.content,
+                                    date = dateString,
+                                    coverImage = coverImageUrl,
+                                    isFavorite = note.isFavorite,
+                                    onFavToggle = { isFav ->
+                                        FirebaseFirestore.getInstance().collection("notes")
+                                            .document(note.id)
+                                            .update("isFavorite", isFav)
+                                            .addOnFailureListener { e ->
+                                                Log.e("FavoritePage", "Error updating favorite", e)
+                                            }
+                                    },
+                                    onClick = { navController.navigate(navRoute) }
+                                )
+                            }else{
+                                DynamicPortraitCard(
+                                    title = note.title,
+                                    description = note.content,
+                                    date = dateString,
+                                    coverImage = coverImageUrl,
+                                    isFavorite = note.isFavorite,
+                                    onFavToggle = { isFav ->
+                                        FirebaseFirestore.getInstance().collection("notes")
+                                            .document(note.id)
+                                            .update("isFavorite", isFav)
+                                            .addOnFailureListener { e ->
+                                                Log.e("FavoritePage", "Error updating favorite", e)
+                                            }
+                                    },
+                                    onClick = { navController.navigate(navRoute) }
+                                )
+                            }
                         }
                     }
                 }
             }
-
         }
     }
 }

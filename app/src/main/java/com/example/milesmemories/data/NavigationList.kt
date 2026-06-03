@@ -10,6 +10,7 @@ object NavigationList {
         NavItems(Screen.HomePage.route, R.drawable.nav_home_icon, "Home"),
         NavItems(Screen.FavoritePage.route, R.drawable.nav_fav_icon, "Favorites"),
         NavItems(Screen.AlbumPage.route, R.drawable.nav_album_icon, "Album"),
+        NavItems(Screen.WeatherPage.route, R.drawable.nav_weather_icon, "Weather"),
         NavItems(Screen.ProfilePage.route, R.drawable.nav_profile_icon, "Profile")
     )
 }

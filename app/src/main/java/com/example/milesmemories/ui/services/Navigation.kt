@@ -21,6 +21,8 @@ import com.example.milesmemories.ui.screens.ProfilePage
 import com.example.milesmemories.ui.screens.NoteDetailsPage
 import com.example.milesmemories.ui.screens.PicturePage
 import com.example.milesmemories.ui.screens.SignupPage
+import com.example.milesmemories.ui.screens.WeatherPage
+import com.example.milesmemories.ui.screens.SecurityPage
 
 @Composable
 fun Navigation(isDarkTheme: Boolean, onThemeChange: (Boolean) -> Unit) {
@@ -52,6 +54,12 @@ fun Navigation(isDarkTheme: Boolean, onThemeChange: (Boolean) -> Unit) {
         composable(Screen.AlbumPage.route) {
             AlbumPage(navController)
         }
+        composable(Screen.WeatherPage.route) {
+            WeatherPage(navController)
+        }
+        composable(Screen.SecurityPage.route) {
+            SecurityPage(navController)
+        }
         composable(Screen.ProfilePage.route) {
             ProfilePage(navController, isDarkTheme, onThemeChange)
         }
@@ -66,23 +74,17 @@ fun Navigation(isDarkTheme: Boolean, onThemeChange: (Boolean) -> Unit) {
             route = Screen.AddNotePage.route,
             arguments = listOf(
                 navArgument("page"){ type = NavType.StringType },
-                navArgument("title") { type = NavType.StringType; nullable = true; defaultValue = "" },
-                navArgument("description") { type = NavType.StringType; nullable = true; defaultValue = "" },
-                navArgument("date") { type = NavType.StringType; nullable = true; defaultValue = "Select Date" }
+                navArgument("noteId") { type = NavType.StringType; nullable = true; defaultValue = "" }
             )
         ) { backStackEntry ->
             val args = backStackEntry.arguments
             val page = args?.getString("page") ?: ""
-            val title = args?.getString("title") ?: ""
-            val description = args?.getString("description") ?: ""
-            val date = args?.getString("date") ?: ""
+            val noteId = args?.getString("noteId") ?: ""
 
             AddNotePage(
                 navController,
                 page,
-                title,
-                description,
-                date
+                noteId
             )
         }
         

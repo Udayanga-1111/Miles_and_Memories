@@ -24,12 +24,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun SearchBar(modifier: Modifier = Modifier) {
-    var inputKeyWord by remember { mutableStateOf("") }
+fun SearchBar(
+    modifier: Modifier = Modifier,
+    query: String = "",
+    onQueryChange: (String) -> Unit = {}
+) {
 
     TextField(
-        value = inputKeyWord,
-        onValueChange = { inputKeyWord = it },
+        value = query,
+        onValueChange = { onQueryChange(it) },
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 16.dp),
@@ -47,8 +50,8 @@ fun SearchBar(modifier: Modifier = Modifier) {
             )
         },
         trailingIcon = {
-            if (inputKeyWord.isNotEmpty()) {
-                IconButton(onClick = { inputKeyWord = "" }) {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Clear search",

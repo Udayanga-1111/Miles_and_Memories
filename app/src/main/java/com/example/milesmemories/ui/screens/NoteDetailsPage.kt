@@ -28,7 +28,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LocationOn
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
+import android.content.ActivityNotFoundException
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -40,6 +47,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +59,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,10 +69,11 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.milesmemories.R
 import com.example.milesmemories.models.Note
-import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.media.MediaPlayer
+import com.google.firebase.firestore.FirebaseFirestore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,19 +84,20 @@ fun NoteDetailsPage(
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val context = LocalContext.current
     
     var note by remember { mutableStateOf<Note?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(noteId) {
         FirebaseFirestore.getInstance().collection("notes").document(noteId)
-            .get()
-            .addOnSuccessListener { document ->
-                note = document.toObject(Note::class.java)
-                isLoading = false
-            }
-            .addOnFailureListener {
-                isLoading = false
+            .addSnapshotListener { document, error ->
+                if (error == null && document != null) {
+                    note = document.toObject(Note::class.java)
+                    isLoading = false
+                } else {
+                    isLoading = false
+                }
             }
     }
 
@@ -110,11 +121,18 @@ fun NoteDetailsPage(
                 },
                 actions = {
                     note?.let { n ->
-                        val dateString = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(n.date))
-                        val safeTitle = java.net.URLEncoder.encode(n.title.ifEmpty { " " }, "UTF-8")
-                        val safeDesc = java.net.URLEncoder.encode(n.content.ifEmpty { " " }, "UTF-8")
-                        val safeDate = java.net.URLEncoder.encode(dateString, "UTF-8")
-                        IconButton(onClick = { navController.navigate("add_note_page/Edit Note?title=$safeTitle&description=$safeDesc&date=$safeDate") }) {
+                        IconButton(onClick = {
+                            FirebaseFirestore.getInstance().collection("notes").document(n.id)
+                                .update("isFavorite", !n.isFavorite)
+                        }) {
+                            Icon(
+                                painter = painterResource(R.drawable.nav_fav_icon),
+                                contentDescription = "Favorite",
+                                tint = if (n.isFavorite) Color(0xFFFF4081) else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        IconButton(onClick = { navController.navigate("add_note_page/Edit Note?noteId=${n.id}") }) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Edit",
@@ -124,9 +142,18 @@ fun NoteDetailsPage(
                     }
                     IconButton(onClick = {
                         note?.id?.let { id ->
-                            FirebaseFirestore.getInstance().collection("notes").document(id).delete()
-                                .addOnSuccessListener { 
-                                    onNavigateBack()
+                            val db = FirebaseFirestore.getInstance()
+                            db.collection("notes").document(id).delete()
+                                .addOnSuccessListener {
+                                    db.collection("albums").whereEqualTo("noteId", id).get()
+                                        .addOnSuccessListener { snapshot ->
+                                            for (doc in snapshot.documents) {
+                                                db.collection("albums").document(doc.id).delete()
+                                            }
+                                            onNavigateBack()
+                                        }.addOnFailureListener {
+                                            onNavigateBack()
+                                        }
                                 }
                         }
                     }) {
@@ -237,6 +264,44 @@ fun NoteDetailsPage(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
+                        if (currentNote.location.isNotBlank()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .background(
+                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        val gmmIntentUri = Uri.parse("geo:0,0?q=${Uri.encode(currentNote.location)}")
+                                        val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
+                                        mapIntent.setPackage("com.google.android.apps.maps")
+                                        try {
+                                            context.startActivity(mapIntent)
+                                        } catch (e: ActivityNotFoundException) {
+                                            Toast.makeText(context, "Google Maps app is missing.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = "Location",
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = currentNote.location,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    fontSize = 16.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+
                         // Title
                         Text(
                             text = currentNote.title,
@@ -304,32 +369,11 @@ fun NoteDetailsPage(
                         Spacer(modifier = Modifier.height(15.dp))
 
                         currentNote.voiceUrls.forEachIndexed { index, url ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Play Audio",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(32.dp)
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column {
-                                    Text(
-                                        text = "Journey Audio Note ${index + 1}",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
+                            val title = currentNote.voiceNames.getOrNull(index)?.takeIf { it.isNotBlank() } ?: "Journey Audio Note ${index + 1}"
+                            AudioPlayerRow(
+                                url = url,
+                                title = title
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.height(32.dp))
@@ -368,6 +412,168 @@ fun NoteDetailsPage(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AudioPlayerRow(url: String, title: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var isPlaying by remember { mutableStateOf(false) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var isLoadingAudio by remember { mutableStateOf(false) }
+    
+    var currentPosition by remember { mutableStateOf(0) }
+    var totalDuration by remember { mutableStateOf(0) }
+    var isDraggingSlider by remember { mutableStateOf(false) }
+
+    DisposableEffect(url) {
+        onDispose {
+            mediaPlayer?.release()
+        }
+    }
+
+    LaunchedEffect(isPlaying, isDraggingSlider) {
+        while (isPlaying && !isDraggingSlider) {
+            mediaPlayer?.let { player ->
+                if (player.isPlaying) {
+                    currentPosition = player.currentPosition
+                }
+            }
+            kotlinx.coroutines.delay(100)
+        }
+    }
+
+    fun formatTime(ms: Int): String {
+        val seconds = (ms / 1000) % 60
+        val minutes = (ms / 1000) / 60
+        return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant,
+                RoundedCornerShape(8.dp)
+            )
+            .padding(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isLoadingAudio) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(32.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            } else {
+                IconButton(onClick = {
+                    if (isPlaying) {
+                        mediaPlayer?.pause()
+                        isPlaying = false
+                    } else {
+                        if (mediaPlayer == null) {
+                            isLoadingAudio = true
+                            try {
+                                val streamUrl = if (url.contains("res.cloudinary.com") && !url.endsWith(".mp4")) {
+                                    if (url.contains(".")) url.substringBeforeLast(".") + ".mp4" else "$url.mp4"
+                                } else url
+                                
+                                val player = MediaPlayer()
+                                player.setAudioAttributes(
+                                    android.media.AudioAttributes.Builder()
+                                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                                        .build()
+                                )
+                                player.setDataSource(streamUrl)
+                                player.prepareAsync()
+                                player.setOnPreparedListener {
+                                    isLoadingAudio = false
+                                    totalDuration = it.duration
+                                    it.start()
+                                    isPlaying = true
+                                }
+                                player.setOnCompletionListener {
+                                    isPlaying = false
+                                    mediaPlayer?.seekTo(0)
+                                    currentPosition = 0
+                                }
+                                player.setOnErrorListener { _, what, extra ->
+                                    isLoadingAudio = false
+                                    android.widget.Toast.makeText(context, "Cloudinary Audio Streaming Error: $what ($extra)", android.widget.Toast.LENGTH_LONG).show()
+                                    false
+                                }
+                                mediaPlayer = player
+                            } catch (e: Exception) {
+                                isLoadingAudio = false
+                                android.widget.Toast.makeText(context, "Network Error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        } else {
+                            mediaPlayer?.start()
+                            isPlaying = true
+                        }
+                    }
+                }) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = "Play/Pause Audio",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        
+        AnimatedVisibility(visible = mediaPlayer != null) {
+            Column {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = formatTime(currentPosition),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    androidx.compose.material3.Slider(
+                        value = if (totalDuration > 0) currentPosition.toFloat() else 0f,
+                        onValueChange = { newValue ->
+                            isDraggingSlider = true
+                            currentPosition = newValue.toInt()
+                        },
+                        onValueChangeFinished = {
+                            isDraggingSlider = false
+                            mediaPlayer?.seekTo(currentPosition)
+                        },
+                        valueRange = 0f..(if (totalDuration > 0) totalDuration.toFloat() else 100f),
+                        modifier = Modifier.weight(1f),
+                        colors = androidx.compose.material3.SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = formatTime(totalDuration),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

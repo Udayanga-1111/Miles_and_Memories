@@ -5,10 +5,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -113,87 +117,139 @@ fun AlbumCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DynamicAlbumCard(
     navController: NavController,
     albumId: String,
     title: String,
-    imageUrls: List<String>
+    imageUrls: List<String>,
+    isSelected: Boolean = false,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = { navController.navigate(route = "picture_page/$albumId") },
+    onLongClick: () -> Unit = {}
 ){
     val image1 = imageUrls.getOrNull(0)
     val image2 = imageUrls.getOrNull(1)
     val image3 = imageUrls.getOrNull(2)
+    val imageCount = imageUrls.size
 
     // Album Card
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(bottom = 5.dp)
-            .clickable(onClick = { navController.navigate(route = "picture_page/$albumId")})
+        modifier = modifier
+            .padding(bottom = 5.dp)
+            .combinedClickable(
+                onClick = { onClick() },
+                onLongClick = { onLongClick() }
+            )
     ) {
         ElevatedCard(
             modifier = Modifier
-                .height(180.dp)
-                .width(180.dp),
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .border(
+                    width = if (isSelected) 4.dp else 0.dp,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
+                    shape = RoundedCornerShape(20.dp)
+                ),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp)
         ){
             Column(
                 modifier = Modifier
+                    .fillMaxSize()
                     .border(
                         BorderStroke(1.dp, color = MaterialTheme.colorScheme.outlineVariant),
                         shape = RoundedCornerShape(20.dp)
                     ),
                 verticalArrangement = Arrangement.SpaceBetween
             ){
-                // Card Cover 1
-                if (image1 != null) {
-                    AsyncImage(
-                        model = image1,
-                        contentDescription = "pic 1",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                            .weight(1f)
-                            .fillMaxWidth()
-                    )
-                } else {
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant))
-                }
-
-                Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
+                if (imageCount == 1) {
+                    if (image1 != null) {
+                        AsyncImage(
+                            model = image1,
+                            contentDescription = "pic 1",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(20.dp))
+                        )
+                    }
+                } else if (imageCount == 2) {
+                    if (image1 != null) {
+                        AsyncImage(
+                            model = image1,
+                            contentDescription = "pic 1",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                        )
+                    }
                     if (image2 != null) {
                         AsyncImage(
                             model = image2,
-                            contentDescription = "pic2",
+                            contentDescription = "pic 2",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(bottomStart = 20.dp))
                                 .weight(1f)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
                                 .border(
                                     BorderStroke(1.dp, color = MaterialTheme.colorScheme.outlineVariant),
-                                    shape = RoundedCornerShape(bottomStart = 20.dp)
+                                    shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
                                 )
                         )
-                    } else {
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant))
                     }
-                    if (image3 != null) {
+                } else if (imageCount >= 3) {
+                    // Card Cover 1
+                    if (image1 != null) {
                         AsyncImage(
-                            model = image3,
-                            contentDescription = "pic3",
+                            model = image1,
+                            contentDescription = "pic 1",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(bottomEnd = 20.dp))
+                                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                                 .weight(1f)
-                                .border(
-                                    BorderStroke(1.dp, color = MaterialTheme.colorScheme.outlineVariant),
-                                    shape = RoundedCornerShape(bottomEnd = 20.dp)
-                                )
+                                .fillMaxWidth()
                         )
-                    } else {
-                         Box(modifier = Modifier.weight(1f).fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant))
                     }
+
+                    Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
+                        if (image2 != null) {
+                            AsyncImage(
+                                model = image2,
+                                contentDescription = "pic2",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(bottomStart = 20.dp))
+                                    .weight(1f)
+                                    .border(
+                                        BorderStroke(1.dp, color = MaterialTheme.colorScheme.outlineVariant),
+                                        shape = RoundedCornerShape(bottomStart = 20.dp)
+                                    )
+                            )
+                        }
+                        if (image3 != null) {
+                            AsyncImage(
+                                model = image3,
+                                contentDescription = "pic3",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(bottomEnd = 20.dp))
+                                    .weight(1f)
+                                    .border(
+                                        BorderStroke(1.dp, color = MaterialTheme.colorScheme.outlineVariant),
+                                        shape = RoundedCornerShape(bottomEnd = 20.dp)
+                                    )
+                            )
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
                 }
             }
         }

@@ -86,7 +86,7 @@ fun PortraitCard(
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FavButton()
+                FavButton(isFavorite = false, onToggle = {})
             }
 
             // Card Info Overlay
@@ -193,7 +193,7 @@ fun LandscapeCard(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        FavButton()
+                        FavButton(isFavorite = false, onToggle = {})
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -226,6 +226,8 @@ fun DynamicPortraitCard(
     description: String,
     date: String,
     coverImage: String?,
+    isFavorite: Boolean,
+    onFavToggle: (Boolean) -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -259,7 +261,7 @@ fun DynamicPortraitCard(
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FavButton()
+                FavButton(isFavorite = isFavorite, onToggle = onFavToggle)
             }
 
             // Card Info Overlay
@@ -318,6 +320,8 @@ fun DynamicLandscapeCard(
     description: String,
     date: String,
     coverImage: String?,
+    isFavorite: Boolean,
+    onFavToggle: (Boolean) -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
     ) {
@@ -370,7 +374,7 @@ fun DynamicLandscapeCard(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        FavButton()
+                        FavButton(isFavorite = isFavorite, onToggle = onFavToggle)
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -398,11 +402,9 @@ fun DynamicLandscapeCard(
 
 // Fav Button
 @Composable
-fun FavButton() {
-    var isFavorite by remember { mutableStateOf(false) }
-
+fun FavButton(isFavorite: Boolean, onToggle: (Boolean) -> Unit) {
     Surface(
-        onClick = { isFavorite = !isFavorite },
+        onClick = { onToggle(!isFavorite) },
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
         modifier = Modifier.size(40.dp)

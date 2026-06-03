@@ -53,6 +53,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.text.google.fonts)
     implementation(libs.androidx.compose.animation.core.lint)
     implementation(libs.coil.compose)
+    implementation(libs.play.services.location)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -76,9 +77,19 @@ dependencies {
     implementation("com.google.firebase:firebase-auth:24.0.1")
     //noinspection UseTomlInstead
     implementation("com.google.firebase:firebase-firestore:26.1.2")
-    //noinspection UseTomlInstead
-    implementation("com.google.firebase:firebase-storage:22.0.1")
+    
+    // Cloudinary for Media
+    implementation("com.cloudinary:cloudinary-android:2.4.0")
+
+    // Location
+    implementation("com.google.android.gms:play-services-location:21.2.0")
+
+    // OpenStreetMap
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
 
     // Google Login
     implementation("com.google.android.gms:play-services-auth:21.5.1")
+    
+    // Biometric Authentication
+    implementation("androidx.biometric:biometric:1.2.0-alpha05")
 }

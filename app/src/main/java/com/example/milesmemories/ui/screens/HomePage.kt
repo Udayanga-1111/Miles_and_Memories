@@ -37,9 +37,9 @@ import com.example.milesmemories.ui.components.TitleHeader
 fun HomePage(navController: NavController) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    
     val notes = remember { mutableStateListOf<Note>() }
     var isLoading by remember { mutableStateOf(true) }
+    var searchQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid
@@ -68,7 +68,11 @@ fun HomePage(navController: NavController) {
 
     Scaffold(
         topBar = {
-            TitleHeader(true)
+            TitleHeader(
+                searchBar = true,
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it }
+            )
         },
         bottomBar = {
             NavigationBar(navController = navController)
@@ -103,9 +107,14 @@ fun HomePage(navController: NavController) {
                     } else {
                         Header("Journeys", "${notes.size}")
                         Spacer(modifier = Modifier.height(10.dp))
-                        SearchBar()
+                        SearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
                         Spacer(modifier = Modifier.height(10.dp))
                     }
+                }
+
+                val filteredNotes = if (searchQuery.isBlank()) notes else notes.filter { 
+                    it.title.contains(searchQuery, ignoreCase = true) || 
+                    it.content.contains(searchQuery, ignoreCase = true) 
                 }
 
                 if (isLoading) {
@@ -120,8 +129,16 @@ fun HomePage(navController: NavController) {
                             modifier = Modifier.padding(20.dp)
                         )
                     }
+                } else if (filteredNotes.isEmpty()) {
+                    item {
+                        androidx.compose.material3.Text(
+                            text = "No journeys match your search.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(20.dp)
+                        )
+                    }
                 } else {
-                    notes.forEach { note ->
+                    filteredNotes.forEach { note ->
                         item {
                             val dateString = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(note.date))
                             val coverImageUrl = if (note.imageUrls.isNotEmpty()) note.imageUrls.first() else null
@@ -133,6 +150,15 @@ fun HomePage(navController: NavController) {
                                     description = note.content,
                                     date = dateString,
                                     coverImage = coverImageUrl,
+                                    isFavorite = note.isFavorite,
+                                    onFavToggle = { isFav ->
+                                        FirebaseFirestore.getInstance().collection("notes")
+                                            .document(note.id)
+                                            .update("isFavorite", isFav)
+                                            .addOnFailureListener { e ->
+                                                Log.e("HomePage", "Error updating favorite", e)
+                                            }
+                                    },
                                     onClick = { navController.navigate(navRoute) }
                                 )
                             }else{
@@ -141,6 +167,15 @@ fun HomePage(navController: NavController) {
                                     description = note.content,
                                     date = dateString,
                                     coverImage = coverImageUrl,
+                                    isFavorite = note.isFavorite,
+                                    onFavToggle = { isFav ->
+                                        FirebaseFirestore.getInstance().collection("notes")
+                                            .document(note.id)
+                                            .update("isFavorite", isFav)
+                                            .addOnFailureListener { e ->
+                                                Log.e("HomePage", "Error updating favorite", e)
+                                            }
+                                    },
                                     onClick = { navController.navigate(navRoute) }
                                 )
                             }

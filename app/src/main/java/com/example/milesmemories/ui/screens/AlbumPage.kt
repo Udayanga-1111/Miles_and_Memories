@@ -1,15 +1,23 @@
 package com.example.milesmemories.ui.screens
 
+import android.content.res.Configuration
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -17,6 +25,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -28,6 +37,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.example.milesmemories.models.Album
 import androidx.compose.material3.CircularProgressIndicator
 import android.util.Log
+import androidx.compose.foundation.layout.Row
 import com.example.milesmemories.ui.components.NavigationBar
 import com.example.milesmemories.ui.components.TitleHeader
 
@@ -38,6 +48,8 @@ fun AlbumPage(navController: NavController){
     
     val albums = remember { mutableStateListOf<Album>() }
     var isLoading by remember { mutableStateOf(true) }
+    var selectedAlbums by remember { mutableStateOf(setOf<Album>()) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid
@@ -80,10 +92,22 @@ fun AlbumPage(navController: NavController){
                 .padding(innerPadding)
         ) {
 
-            Box(
-                modifier = Modifier.padding(vertical = 10.dp, horizontal = 15.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp, horizontal = 15.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ){
-                Header("Album")
+                Box(modifier = Modifier.weight(1f)) {
+                    Header("Album")
+                }
+                
+                if (selectedAlbums.isNotEmpty()) {
+                    IconButton(onClick = { showDeleteConfirm = true }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete Selected", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
 
             // Main Content
@@ -96,20 +120,74 @@ fun AlbumPage(navController: NavController){
                     modifier = Modifier.padding(20.dp)
                 )
             } else {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth()
-                        .padding(vertical = 15.dp, horizontal = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceAround
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 15.dp, horizontal = 10.dp)
                 ) {
-                    albums.forEach { album ->
-                        DynamicAlbumCard(
-                            navController = navController,
-                            albumId = album.id,
-                            title = album.title,
-                            imageUrls = album.imageUrls
-                        )
+                    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+                    val columns = if (isLandscape) 3 else 2
+                    val spacing = 15.dp
+                    val itemWidth = (maxWidth - spacing * (columns - 1)) / columns
+
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(spacing, Alignment.Start),
+                        verticalArrangement = Arrangement.spacedBy(spacing)
+                    ) {
+                        albums.forEach { album ->
+                            val isSelected = selectedAlbums.contains(album)
+                            DynamicAlbumCard(
+                                navController = navController,
+                                albumId = album.id,
+                                title = album.title,
+                                imageUrls = album.imageUrls,
+                                isSelected = isSelected,
+                                modifier = Modifier.width(itemWidth),
+                                onClick = {
+                                    if (selectedAlbums.isNotEmpty()) {
+                                        val newSelection = selectedAlbums.toMutableSet()
+                                        if (isSelected) newSelection.remove(album) else newSelection.add(album)
+                                        selectedAlbums = newSelection
+                                    } else {
+                                        navController.navigate(route = "picture_page/${album.id}")
+                                    }
+                                },
+                                onLongClick = {
+                                    val newSelection = selectedAlbums.toMutableSet()
+                                    if (isSelected) newSelection.remove(album) else newSelection.add(album)
+                                    selectedAlbums = newSelection
+                                }
+                            )
+                        }
                     }
                 }
+            }
+
+            if (showDeleteConfirm) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showDeleteConfirm = false },
+                    title = { androidx.compose.material3.Text("Delete Albums") },
+                    text = { androidx.compose.material3.Text("Are you sure you want to delete ${selectedAlbums.size} album(s)? This will also remove the images from the associated notes.") },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                selectedAlbums.forEach { album ->
+                                    FirebaseFirestore.getInstance().collection("notes").document(album.noteId)
+                                        .update("imageUrls", emptyList<String>())
+                                    FirebaseFirestore.getInstance().collection("albums").document(album.id).delete()
+                                }
+                                selectedAlbums = emptySet()
+                                showDeleteConfirm = false
+                            }
+                        ) {
+                            androidx.compose.material3.Text("Delete", color = androidx.compose.material3.MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { showDeleteConfirm = false }) {
+                            androidx.compose.material3.Text("Cancel")
+                        }
+                    }
+                )
             }
         }
     }

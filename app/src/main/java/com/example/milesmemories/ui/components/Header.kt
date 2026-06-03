@@ -67,7 +67,11 @@ fun Header(mainTitle: String, noOfItems: String = "") {
 }
 
 @Composable
-fun TitleHeader(searchBar: Boolean) {
+fun TitleHeader(
+    searchBar: Boolean,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {}
+) {
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -94,8 +98,8 @@ fun TitleHeader(searchBar: Boolean) {
                 modifier = Modifier.padding(vertical = 5.dp, horizontal = 10.dp)
             )
 
-            // Search bar for Landscape mode
-            if (isLandscape && searchBar) {
+            // Search bar for both Portrait and Landscape mode
+            if (searchBar) {
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = "Search Icon",
@@ -115,7 +119,7 @@ fun TitleHeader(searchBar: Boolean) {
         AnimatedVisibility(searchBarVisibility && searchBar,
             modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = 20.dp)) {
-            SearchBar()
+            SearchBar(query = searchQuery, onQueryChange = onSearchQueryChange)
         }
     }
 
