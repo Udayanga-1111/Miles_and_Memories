@@ -265,6 +265,9 @@ fun LogOut(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, 
         onConfirm = { 
             showDialog = false
             com.example.milesmemories.utils.OfflineProfileManager.clearProfileData(context)
+            // Clear biometric lock preference on logout
+            context.getSharedPreferences("miles_memories_prefs", android.content.Context.MODE_PRIVATE)
+                .edit().putBoolean("biometric_enabled", false).apply()
             FirebaseAuth.getInstance().signOut()
             com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(
                 context, 

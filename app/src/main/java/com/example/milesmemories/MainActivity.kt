@@ -95,7 +95,7 @@ class MainActivity : FragmentActivity(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_LIGHT) {
             val lux = event.values[0]
-            val maxLux = 1000f // Cap for normalization
+            val maxLux = 20000f // Cap for normalization (outdoor sunlight ~20000 lux)
             val normalizedLux = (lux / maxLux).coerceIn(0.1f, 1.0f)
             
             val layoutParams = window.attributes

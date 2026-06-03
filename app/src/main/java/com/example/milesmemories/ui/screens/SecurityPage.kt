@@ -1,5 +1,6 @@
 package com.example.milesmemories.ui.screens
 
+import android.content.Context
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -17,12 +18,18 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavController
 
+const val PREF_NAME = "miles_memories_prefs"
+const val PREF_BIOMETRIC_ENABLED = "biometric_enabled"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SecurityPage(navController: NavController) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
-    var isBiometricEnabled by remember { mutableStateOf(false) }
+
+    // Read the persisted preference
+    val prefs = remember { context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE) }
+    var isBiometricEnabled by remember { mutableStateOf(prefs.getBoolean(PREF_BIOMETRIC_ENABLED, false)) }
 
     Scaffold(
         topBar = {
@@ -63,7 +70,10 @@ fun SecurityPage(navController: NavController) {
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Use fingerprint to authenticate",
+                            text = if (isBiometricEnabled)
+                                "Fingerprint required on every app open"
+                            else
+                                "Use fingerprint to lock the app",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -73,6 +83,7 @@ fun SecurityPage(navController: NavController) {
                     checked = isBiometricEnabled,
                     onCheckedChange = { isChecked ->
                         if (isChecked) {
+                            // Enabling: verify with biometric first
                             val biometricManager = BiometricManager.from(context)
                             when (biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)) {
                                 BiometricManager.BIOMETRIC_SUCCESS -> {
@@ -82,52 +93,92 @@ fun SecurityPage(navController: NavController) {
                                             object : BiometricPrompt.AuthenticationCallback() {
                                                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                                                     super.onAuthenticationError(errorCode, errString)
-                                                    Toast.makeText(context, "Authentication error: $errString", Toast.LENGTH_SHORT).show()
-                                                    isBiometricEnabled = false
+                                                    Toast.makeText(context, "Authentication cancelled", Toast.LENGTH_SHORT).show()
                                                 }
                                                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                                                     super.onAuthenticationSucceeded(result)
-                                                    Toast.makeText(context, "Authentication succeeded!", Toast.LENGTH_SHORT).show()
+                                                    // Persist the setting
+                                                    prefs.edit().putBoolean(PREF_BIOMETRIC_ENABLED, true).apply()
                                                     isBiometricEnabled = true
+                                                    Toast.makeText(context, "Biometric login enabled!", Toast.LENGTH_SHORT).show()
                                                 }
                                                 override fun onAuthenticationFailed() {
                                                     super.onAuthenticationFailed()
-                                                    Toast.makeText(context, "Authentication failed", Toast.LENGTH_SHORT).show()
-                                                    isBiometricEnabled = false
+                                                    Toast.makeText(context, "Authentication failed. Try again.", Toast.LENGTH_SHORT).show()
                                                 }
                                             })
-                                            
                                         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                                            .setTitle("Biometric login")
-                                            .setSubtitle("Log in using your biometric credential")
+                                            .setTitle("Confirm your fingerprint")
+                                            .setSubtitle("Verify to enable biometric login")
                                             .setNegativeButtonText("Cancel")
                                             .build()
-                                            
                                         biometricPrompt.authenticate(promptInfo)
-                                    } else {
-                                        Toast.makeText(context, "Cannot show biometric prompt", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                                 BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> {
-                                    Toast.makeText(context, "No biometric features available on this device.", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "No biometric hardware available on this device.", Toast.LENGTH_LONG).show()
                                 }
                                 BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
-                                    Toast.makeText(context, "Biometric features are currently unavailable.", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "Biometric hardware is currently unavailable.", Toast.LENGTH_LONG).show()
                                 }
                                 BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
-                                    Toast.makeText(context, "No fingerprints registered on device. Please register one in settings.", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "No fingerprints registered. Please go to Settings > Security to add one.", Toast.LENGTH_LONG).show()
                                 }
                                 else -> {
                                     Toast.makeText(context, "Biometric status unknown.", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         } else {
-                            isBiometricEnabled = false
+                            // Disabling: also verify first so someone can't just turn it off
+                            if (activity != null) {
+                                val biometricManager = BiometricManager.from(context)
+                                if (biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS) {
+                                    val executor = ContextCompat.getMainExecutor(context)
+                                    val biometricPrompt = BiometricPrompt(activity, executor,
+                                        object : BiometricPrompt.AuthenticationCallback() {
+                                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                                super.onAuthenticationSucceeded(result)
+                                                prefs.edit().putBoolean(PREF_BIOMETRIC_ENABLED, false).apply()
+                                                isBiometricEnabled = false
+                                                Toast.makeText(context, "Biometric login disabled.", Toast.LENGTH_SHORT).show()
+                                            }
+                                            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                                Toast.makeText(context, "Cancelled", Toast.LENGTH_SHORT).show()
+                                            }
+                                            override fun onAuthenticationFailed() {
+                                                Toast.makeText(context, "Authentication failed.", Toast.LENGTH_SHORT).show()
+                                            }
+                                        })
+                                    val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                                        .setTitle("Confirm your fingerprint")
+                                        .setSubtitle("Verify to disable biometric login")
+                                        .setNegativeButtonText("Cancel")
+                                        .build()
+                                    biometricPrompt.authenticate(promptInfo)
+                                } else {
+                                    prefs.edit().putBoolean(PREF_BIOMETRIC_ENABLED, false).apply()
+                                    isBiometricEnabled = false
+                                }
+                            }
                         }
                     }
                 )
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            if (isBiometricEnabled) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Text(
+                        text = "✓ App will require fingerprint verification every time you open it.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
         }
     }
 }
