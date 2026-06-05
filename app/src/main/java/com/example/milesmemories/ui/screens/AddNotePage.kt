@@ -90,6 +90,9 @@ import android.location.Geocoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.example.milesmemories.models.Note
+import com.example.milesmemories.models.toNote
+import com.example.milesmemories.ui.components.FavoriteIconButton
+import com.example.milesmemories.utils.updateNoteFavorite
 import com.example.milesmemories.models.Album
 import androidx.compose.material3.CircularProgressIndicator
 import kotlin.coroutines.suspendCoroutine
@@ -107,6 +110,8 @@ import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.FileProvider
+import android.os.Environment
 
 @Composable
 fun AddNotePage(
@@ -135,7 +140,8 @@ fun AddNotePage(
     val existingImageUrls = remember { mutableStateListOf<String>() }
     val existingAudioUrls = remember { mutableStateListOf<String>() }
     val existingAudioNames = remember { mutableStateListOf<String>() }
-    var originalNote by remember { mutableStateOf<Note?>(null) }
+    var originalNote by remember(noteId) { mutableStateOf<Note?>(null) }
+    var isFavorite by remember(noteId) { mutableStateOf(false) }
 
     val selectedImages = remember { mutableStateListOf<Uri>() }
     val selectedAudio = remember { mutableStateListOf<Uri>() }
@@ -151,26 +157,36 @@ fun AddNotePage(
     val auth = remember { FirebaseAuth.getInstance() }
     val db = remember { FirebaseFirestore.getInstance() }
     
+    // Camera Support
+    var showImageSourceDialog by remember { mutableStateOf(false) }
+    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
+
     LaunchedEffect(noteId) {
         if (!noteId.isNullOrEmpty()) {
-            db.collection("notes").document(noteId).get()
-                .addOnSuccessListener { document ->
-                    val n = document.toObject(Note::class.java)
-                    if (n != null) {
-                        originalNote = n
-                        noteTitle = n.title
-                        noteContent = n.content
-                        location = n.location
-                        selectedDateMillis = n.date
-                        
-                        existingImageUrls.addAll(n.imageUrls)
-                        existingAudioUrls.addAll(n.voiceUrls)
-                        
-                        val names = n.voiceNames.toMutableList()
-                        while (names.size < n.voiceUrls.size) {
-                            names.add("Journey Audio Note ${names.size + 1}")
+            db.collection("notes").document(noteId)
+                .addSnapshotListener { document, error ->
+                    if (error == null && document != null && document.exists()) {
+                        val n = document.toNote() ?: return@addSnapshotListener
+                        isFavorite = n.isFavorite
+                        if (originalNote == null) {
+                            originalNote = n
+                            noteTitle = n.title
+                            noteContent = n.content
+                            location = n.location
+                            selectedDateMillis = n.date
+
+                            existingImageUrls.clear()
+                            existingImageUrls.addAll(n.imageUrls)
+                            existingAudioUrls.clear()
+                            existingAudioUrls.addAll(n.voiceUrls)
+                            existingAudioNames.clear()
+
+                            val names = n.voiceNames.toMutableList()
+                            while (names.size < n.voiceUrls.size) {
+                                names.add("Journey Audio Note ${names.size + 1}")
+                            }
+                            existingAudioNames.addAll(names)
                         }
-                        existingAudioNames.addAll(names)
                     }
                 }
         }
@@ -245,6 +261,30 @@ fun AddNotePage(
         contract = ActivityResultContracts.PickMultipleVisualMedia(),
         onResult = { uris ->
             selectedImages.addAll(uris)
+        }
+    )
+
+    // Camera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture(),
+        onResult = { success ->
+            if (success) {
+                capturedImageUri?.let { selectedImages.add(it) }
+            }
+        }
+    )
+
+    // Camera Permission Launcher
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                val uri = createTempImageUri(context)
+                capturedImageUri = uri
+                cameraLauncher.launch(uri)
+            } else {
+                Toast.makeText(context, "Camera permission denied.", Toast.LENGTH_SHORT).show()
+            }
         }
     )
 
@@ -404,7 +444,7 @@ fun AddNotePage(
                     imageUrls = finalImageUrls,
                     voiceUrls = finalVoiceUrls,
                     voiceNames = finalVoiceNames,
-                    isFavorite = originalNote?.isFavorite ?: false
+                    isFavorite = isFavorite
                 )
                 noteRef.set(newNote) // Overwrites note while keeping favorite status and id intact
 
@@ -469,6 +509,18 @@ fun AddNotePage(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    FavoriteIconButton(
+                        isFavorite = isFavorite,
+                        onToggle = { isFav ->
+                            isFavorite = isFav
+                            if (!noteId.isNullOrEmpty()) {
+                                updateNoteFavorite(noteId, isFav) {
+                                    isFavorite = !isFav
+                                }
+                            }
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Discard(navController)
                     Spacer(modifier = Modifier.width(8.dp))
                     if (isSaving) {
@@ -879,11 +931,7 @@ fun AddNotePage(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .clickable {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        }
+                        .clickable { showImageSourceDialog = true }
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Icon(
@@ -900,6 +948,38 @@ fun AddNotePage(
                 }
             }
         }
+    }
+
+    if (showImageSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            title = { Text("Select Image Source") },
+            text = { Text("How would you like to add an image?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        val uri = createTempImageUri(context)
+                        capturedImageUri = uri
+                        cameraLauncher.launch(uri)
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                }) {
+                    Text("Take Photo")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    photoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }) {
+                    Text("Select from Gallery")
+                }
+            }
+        )
     }
 
     if (fullScreenImageUri != null) {
@@ -1171,6 +1251,11 @@ fun AddNotePage(
             }
         }
     }
+}
+
+fun createTempImageUri(context: android.content.Context): Uri {
+    val tempFile = File.createTempFile("camera_img_", ".jpg", context.getExternalFilesDir(Environment.DIRECTORY_PICTURES))
+    return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
 }
 
 @Composable

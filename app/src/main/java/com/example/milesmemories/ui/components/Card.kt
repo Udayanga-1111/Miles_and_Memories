@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,7 +87,7 @@ fun PortraitCard(
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FavButton(isFavorite = false, onToggle = {})
+                FavButton(noteId = "preview", isFavorite = false, onToggle = {})
             }
 
             // Card Info Overlay
@@ -193,7 +194,7 @@ fun LandscapeCard(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        FavButton(isFavorite = false, onToggle = {})
+                        FavButton(noteId = "preview", isFavorite = false, onToggle = {})
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -222,6 +223,7 @@ fun LandscapeCard(
 // Dynamic Portrait Card
 @Composable
 fun DynamicPortraitCard(
+    noteId: String,
     title: String,
     description: String,
     date: String,
@@ -237,36 +239,33 @@ fun DynamicPortraitCard(
         modifier = Modifier
             .padding(bottom = 24.dp)
             .height(400.dp)
-            .clickable(onClick = onClick)
     ) {
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Card Cover Image
-            if (coverImage != null) {
-                AsyncImage(
-                    model = coverImage,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Box(modifier = Modifier.fillMaxSize().background(Color.Gray))
-            }
-
-            // Action Buttons
-            Row(
+            Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .fillMaxSize()
+                    .clickable(onClick = onClick)
             ) {
-                FavButton(isFavorite = isFavorite, onToggle = onFavToggle)
-            }
+                // Card Cover Image
+                if (coverImage != null) {
+                    AsyncImage(
+                        model = coverImage,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Gray))
+                }
 
-            // Card Info Overlay
-            Box(modifier = Modifier.background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .9f))
-                .align (Alignment.BottomStart)) {
+                // Card Info Overlay
+                Box(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .9f))
+                        .align(Alignment.BottomStart)
+                ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -308,6 +307,17 @@ fun DynamicPortraitCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                }
+            }
+
+            // Action Buttons (outside card click area)
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FavButton(noteId = noteId, isFavorite = isFavorite, onToggle = onFavToggle)
             }
         }
     }
@@ -316,6 +326,7 @@ fun DynamicPortraitCard(
 // Dynamic Landscape Card
 @Composable
 fun DynamicLandscapeCard(
+    noteId: String,
     title: String,
     description: String,
     date: String,
@@ -332,7 +343,6 @@ fun DynamicLandscapeCard(
         ),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
         modifier = modifier.padding(bottom = 16.dp)
-            .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
@@ -349,9 +359,16 @@ fun DynamicLandscapeCard(
                     modifier = Modifier
                         .width(150.dp)
                         .fillMaxSize()
+                        .clickable(onClick = onClick)
                 )
             } else {
-                Box(modifier = Modifier.width(150.dp).fillMaxSize().background(Color.Gray))
+                Box(
+                    modifier = Modifier
+                        .width(150.dp)
+                        .fillMaxSize()
+                        .background(Color.Gray)
+                        .clickable(onClick = onClick)
+                )
             }
 
             // Card Info
@@ -372,28 +389,33 @@ fun DynamicLandscapeCard(
                             text = title,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(onClick = onClick)
                         )
-                        FavButton(isFavorite = isFavorite, onToggle = onFavToggle)
+                        FavButton(noteId = noteId, isFavorite = isFavorite, onToggle = onFavToggle)
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
-                    
-                    Text(
-                        text = date,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
 
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Column(modifier = Modifier.clickable(onClick = onClick)) {
+                        Text(
+                            text = date,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }
@@ -402,20 +424,62 @@ fun DynamicLandscapeCard(
 
 // Fav Button
 @Composable
-fun FavButton(isFavorite: Boolean, onToggle: (Boolean) -> Unit) {
+fun FavButton(
+    noteId: String,
+    isFavorite: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    var isFav by remember(noteId) { mutableStateOf(isFavorite) }
+
+    LaunchedEffect(isFavorite) {
+        isFav = isFavorite
+    }
+
     Surface(
-        onClick = { onToggle(!isFavorite) },
+        onClick = {
+            isFav = !isFav
+            onToggle(isFav)
+        },
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+        color = if (isFav) {
+            Color(0xFFFF4081).copy(alpha = 0.2f)
+        } else {
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+        },
         modifier = Modifier.size(40.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 painter = painterResource(R.drawable.nav_fav_icon),
-                contentDescription = "Favorite",
-                tint = if (isFavorite) Color(0xFFFF4081) else MaterialTheme.colorScheme.onSurface,
+                contentDescription = if (isFav) "Remove from favorites" else "Add to favorites",
+                tint = if (isFav) Color(0xFFFF4081) else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(25.dp)
             )
         }
+    }
+}
+
+@Composable
+fun FavoriteIconButton(
+    isFavorite: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    var isFav by remember { mutableStateOf(isFavorite) }
+
+    LaunchedEffect(isFavorite) {
+        isFav = isFavorite
+    }
+
+    IconButton(
+        onClick = {
+            isFav = !isFav
+            onToggle(isFav)
+        }
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.nav_fav_icon),
+            contentDescription = if (isFav) "Remove from favorites" else "Add to favorites",
+            tint = if (isFav) Color(0xFFFF4081) else MaterialTheme.colorScheme.onSurface
+        )
     }
 }

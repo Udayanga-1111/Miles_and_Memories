@@ -69,10 +69,13 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.milesmemories.R
 import com.example.milesmemories.models.Note
+import com.example.milesmemories.models.toNote
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import android.media.MediaPlayer
+import com.example.milesmemories.ui.components.FavoriteIconButton
+import com.example.milesmemories.utils.updateNoteFavorite
 import com.google.firebase.firestore.FirebaseFirestore
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,7 +96,7 @@ fun NoteDetailsPage(
         FirebaseFirestore.getInstance().collection("notes").document(noteId)
             .addSnapshotListener { document, error ->
                 if (error == null && document != null) {
-                    note = document.toObject(Note::class.java)
+                    note = document.toNote()
                     isLoading = false
                 } else {
                     isLoading = false
@@ -121,16 +124,16 @@ fun NoteDetailsPage(
                 },
                 actions = {
                     note?.let { n ->
-                        IconButton(onClick = {
-                            FirebaseFirestore.getInstance().collection("notes").document(n.id)
-                                .update("isFavorite", !n.isFavorite)
-                        }) {
-                            Icon(
-                                painter = painterResource(R.drawable.nav_fav_icon),
-                                contentDescription = "Favorite",
-                                tint = if (n.isFavorite) Color(0xFFFF4081) else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                        FavoriteIconButton(
+                            isFavorite = n.isFavorite,
+                            onToggle = { isFav ->
+                                val previous = note
+                                note = n.copy(isFavorite = isFav)
+                                updateNoteFavorite(n.id, isFav) {
+                                    note = previous
+                                }
+                            }
+                        )
 
                         IconButton(onClick = { navController.navigate("add_note_page/Edit Note?noteId=${n.id}") }) {
                             Icon(

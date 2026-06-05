@@ -112,7 +112,12 @@ fun AlbumPage(navController: NavController){
 
             // Main Content
             if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.padding(20.dp))
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.padding(20.dp))
+                }
             } else if (albums.isEmpty()) {
                 androidx.compose.material3.Text(
                     text = "No albums yet. Add notes with images to see them here!",
@@ -121,17 +126,20 @@ fun AlbumPage(navController: NavController){
                 )
             } else {
                 BoxWithConstraints(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 15.dp, horizontal = 10.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-                    val columns = if (isLandscape) 3 else 2
-                    val spacing = 15.dp
-                    val itemWidth = (maxWidth - spacing * (columns - 1)) / columns
+                    val columns = if (isLandscape) 4 else 2
+                    val spacing = 12.dp
+                    val itemWidth = (maxWidth - (spacing * (columns - 1))) / columns
 
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(spacing, Alignment.Start),
-                        verticalArrangement = Arrangement.spacedBy(spacing)
+                        horizontalArrangement = Arrangement.spacedBy(spacing),
+                        verticalArrangement = Arrangement.spacedBy(spacing),
+                        maxItemsInEachRow = columns
                     ) {
                         albums.forEach { album ->
                             val isSelected = selectedAlbums.contains(album)

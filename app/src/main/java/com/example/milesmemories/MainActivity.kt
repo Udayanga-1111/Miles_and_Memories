@@ -26,6 +26,8 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.util.Log
+import android.widget.Toast
 import com.example.milesmemories.utils.SharedLocationManager
 
 class MainActivity : FragmentActivity(), SensorEventListener {
@@ -38,23 +40,22 @@ class MainActivity : FragmentActivity(), SensorEventListener {
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         lightSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_LIGHT)
+        
+        if (lightSensor == null) {
+            Log.w("MainActivity", "Light sensor not found on this device.")
+        }
+
         enableEdgeToEdge()
         setContent {
-
             // Checking the System Theme
             val systemTheme = isSystemInDarkTheme()
             var isDarkTheme by remember {
-                if (systemTheme){
-                    mutableStateOf(true)
-                }else{
-                    mutableStateOf(false)
-                }
+                mutableStateOf(systemTheme)
             }
             
             MilesMemoriesTheme(darkTheme = isDarkTheme) {
                 StatusBarColor(darkIcons = !isDarkTheme)
                 Navigation(isDarkTheme, onThemeChange = { isDarkTheme = it })
-
             }
         }
     }
@@ -68,7 +69,6 @@ class MainActivity : FragmentActivity(), SensorEventListener {
         if (intent?.action == Intent.ACTION_SEND && "text/plain" == intent.type) {
             val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
             if (sharedText != null) {
-                // Try to extract URL, otherwise use the whole text
                 val urlRegex = "(https?://[a-zA-Z0-9./_?=-]+)".toRegex()
                 val match = urlRegex.find(sharedText)
                 if (match != null) {
@@ -95,7 +95,11 @@ class MainActivity : FragmentActivity(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_LIGHT) {
             val lux = event.values[0]
-            val maxLux = 20000f // Cap for normalization (outdoor sunlight ~20000 lux)
+            // Log.d("BrightnessFeature", "Lux value: $lux")
+            
+            // Adjust threshold: 1000 lux is bright indoor light. 
+            // This makes the brightness change much more noticeable indoors.
+            val maxLux = 1000f
             val normalizedLux = (lux / maxLux).coerceIn(0.1f, 1.0f)
             
             val layoutParams = window.attributes

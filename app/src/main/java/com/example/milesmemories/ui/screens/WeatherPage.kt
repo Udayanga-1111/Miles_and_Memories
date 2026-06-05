@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.milesmemories.ui.components.Header
 import com.example.milesmemories.ui.components.NavigationBar
-import com.example.milesmemories.ui.components.SearchBar
 import com.example.milesmemories.ui.components.TitleHeader
 import com.example.milesmemories.utils.WeatherData
 import com.example.milesmemories.utils.WeatherManager
@@ -133,16 +132,7 @@ fun WeatherPage(navController: NavController) {
             ) {
                 item {
                     Spacer(modifier = Modifier.height(10.dp))
-                    if (isLandscape) {
-                        Header("Weather", "")
-                    } else {
-                        Header("Weather", "")
-                        Spacer(modifier = Modifier.height(10.dp))
-                        SearchBar(query = searchQuery, onQueryChange = { 
-                            searchQuery = it 
-                            refreshWeather()
-                        })
-                    }
+                    Header("Weather", "")
                     Spacer(modifier = Modifier.height(10.dp))
                 }
 
