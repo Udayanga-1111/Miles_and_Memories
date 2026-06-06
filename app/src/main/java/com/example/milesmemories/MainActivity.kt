@@ -8,12 +8,15 @@ import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowInsetsControllerCompat
@@ -27,8 +30,8 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.util.Log
-import android.widget.Toast
 import com.example.milesmemories.utils.SharedLocationManager
+import com.example.milesmemories.utils.WeatherManager
 
 class MainActivity : FragmentActivity(), SensorEventListener {
     private var sensorManager: SensorManager? = null
@@ -38,6 +41,9 @@ class MainActivity : FragmentActivity(), SensorEventListener {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
         
+        // Start monitoring network status
+        WeatherManager.startNetworkCallback(this)
+
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         lightSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_LIGHT)
         
@@ -55,7 +61,11 @@ class MainActivity : FragmentActivity(), SensorEventListener {
             
             MilesMemoriesTheme(darkTheme = isDarkTheme) {
                 StatusBarColor(darkIcons = !isDarkTheme)
-                Navigation(isDarkTheme, onThemeChange = { isDarkTheme = it })
+                
+                // Content fills the screen; status bar padding is handled by headers
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Navigation(isDarkTheme, onThemeChange = { isDarkTheme = it })
+                }
             }
         }
     }
@@ -95,10 +105,6 @@ class MainActivity : FragmentActivity(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_LIGHT) {
             val lux = event.values[0]
-            // Log.d("BrightnessFeature", "Lux value: $lux")
-            
-            // Adjust threshold: 1000 lux is bright indoor light. 
-            // This makes the brightness change much more noticeable indoors.
             val maxLux = 1000f
             val normalizedLux = (lux / maxLux).coerceIn(0.1f, 1.0f)
             

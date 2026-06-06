@@ -29,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,19 +57,16 @@ fun WeatherPage(navController: NavController) {
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val isOnline by WeatherManager.isOnline.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var weatherList by remember { mutableStateOf<List<WeatherData>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
-    var isOffline by remember { mutableStateOf(false) }
 
     fun refreshWeather() {
         isLoading = true
         coroutineScope.launch {
-            val online = WeatherManager.isOnline(context)
-            isOffline = !online
-
-            if (online) {
+            if (isOnline) {
                 if (searchQuery.isBlank()) {
                     weatherList = WeatherManager.fetchDefaultWeathers(context)
                 } else {
@@ -82,7 +80,7 @@ fun WeatherPage(navController: NavController) {
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit, isOnline) {
         refreshWeather()
     }
 
@@ -108,22 +106,6 @@ fun WeatherPage(navController: NavController) {
                 .background(MaterialTheme.colorScheme.background)
         ) {
             
-            if (isOffline) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.errorContainer)
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Offline Mode - Showing cached data",
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -145,14 +127,14 @@ fun WeatherPage(navController: NavController) {
                 } else if (weatherList.isEmpty()) {
                     item {
                         Text(
-                            text = if (isOffline) "No offline data available for this location." else "Location not found.",
+                            text = if (!isOnline) "No offline data available for this location." else "Location not found.",
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(20.dp)
                         )
                     }
                 } else {
                     items(weatherList) { weather ->
-                        WeatherCard(weather = weather, isOffline = isOffline)
+                        WeatherCard(weather = weather, isOffline = !isOnline)
                     }
                     item {
                         Spacer(modifier = Modifier.height(20.dp))
