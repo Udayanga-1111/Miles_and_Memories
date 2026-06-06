@@ -1,3 +1,7 @@
+/**
+ * Screen for user registration (Sign Up).
+ * Supports Email/Password and Google Sign-Up.
+ */
 package com.example.milesmemories.ui.screens
 
 import androidx.compose.foundation.Image
@@ -113,7 +117,6 @@ fun SignupPage(
                         elevation = 8.dp
                     )
             )
-            // Header
             Text(
                 text = "Create Account",
                 style = MaterialTheme.typography.displaySmall,
@@ -129,7 +132,6 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Name Field
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -149,7 +151,6 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Email Field
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -169,7 +170,6 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Password Field
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -200,7 +200,6 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Sign Up Button
             Button(
                 onClick = {
                     if (email.isNotEmpty() && password.isNotEmpty() && name.isNotEmpty()) {
@@ -254,7 +253,6 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // "Or continue with" divider
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -277,12 +275,10 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Social Logins
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                // Google Button
                 OutlinedButton(
                     onClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) },
                     modifier = Modifier
@@ -297,7 +293,6 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Login Link
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center

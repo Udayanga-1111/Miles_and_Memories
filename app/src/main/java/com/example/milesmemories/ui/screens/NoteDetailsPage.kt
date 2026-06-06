@@ -1,3 +1,7 @@
+/**
+ * Screen displaying the details of a specific journey/note.
+ * Allows viewing text, playing audio, and viewing attached images.
+ */
 package com.example.milesmemories.ui.screens
 
 import android.content.res.Configuration

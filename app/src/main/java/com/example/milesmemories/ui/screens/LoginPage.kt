@@ -1,6 +1,11 @@
+/**
+ * Screen for user authentication (Login).
+ * Supports Email/Password, Google Sign-In, and Biometric login.
+ */
 package com.example.milesmemories.ui.screens
 
 import android.app.Activity
+import com.example.milesmemories.ui.components.BiometricLockedScreen
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
@@ -225,7 +230,6 @@ fun LoginPage(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Email Field
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -242,7 +246,6 @@ fun LoginPage(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Password Field
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -268,7 +271,6 @@ fun LoginPage(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Login Button
             Button(
                 onClick = {
                     if (email.isNotEmpty() && password.isNotEmpty()) {
@@ -303,7 +305,6 @@ fun LoginPage(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Google Button
             OutlinedButton(
                 onClick = { 
                     if (!isLoading) {
@@ -332,69 +333,3 @@ fun LoginPage(
     }
 }
 
-@Composable
-fun BiometricLockedScreen(
-    onUnlock: () -> Unit,
-    onSignOut: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Fingerprint,
-                contentDescription = "Locked",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(80.dp)
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "App Locked",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Use your fingerprint to unlock",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            Button(
-                onClick = onUnlock,
-                shape = CircleShape,
-                modifier = Modifier.size(72.dp),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Fingerprint,
-                    contentDescription = "Unlock with fingerprint",
-                    modifier = Modifier.size(36.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            TextButton(onClick = onSignOut) {
-                Text(
-                    "Sign out instead",
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-        }
-    }
-}

@@ -23,6 +23,9 @@ import com.example.milesmemories.ui.screens.PicturePage
 import com.example.milesmemories.ui.screens.SignupPage
 import com.example.milesmemories.ui.screens.WeatherPage
 import com.example.milesmemories.ui.screens.SecurityPage
+import com.example.milesmemories.ui.screens.AccountPage
+import com.example.milesmemories.ui.screens.NotificationsPage
+import com.example.milesmemories.ui.screens.AboutPage
 
 @Composable
 fun Navigation(isDarkTheme: Boolean, onThemeChange: (Boolean) -> Unit) {
@@ -59,6 +62,15 @@ fun Navigation(isDarkTheme: Boolean, onThemeChange: (Boolean) -> Unit) {
         }
         composable(Screen.SecurityPage.route) {
             SecurityPage(navController)
+        }
+        composable(Screen.AccountPage.route) {
+            AccountPage(navController)
+        }
+        composable(Screen.NotificationsPage.route) {
+            NotificationsPage(navController)
+        }
+        composable(Screen.AboutPage.route) {
+            AboutPage(navController)
         }
         composable(Screen.ProfilePage.route) {
             ProfilePage(navController, isDarkTheme, onThemeChange)

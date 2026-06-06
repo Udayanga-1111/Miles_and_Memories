@@ -1,3 +1,7 @@
+/**
+ * Screen displaying user profile and application settings.
+ * Supports theme toggling and logging out.
+ */
 package com.example.milesmemories.ui.screens
 
 import androidx.compose.foundation.Image
@@ -25,6 +29,8 @@ import androidx.navigation.NavController
 import com.example.milesmemories.R
 import com.example.milesmemories.ui.components.NavigationBar
 import com.example.milesmemories.ui.components.TitleHeader
+import com.example.milesmemories.ui.components.SettingItem
+import com.example.milesmemories.ui.components.LogOutRow
 import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.size
@@ -100,7 +106,6 @@ fun ProfilePage(
             verticalArrangement = Arrangement.SpaceAround,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // Main Content
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -108,7 +113,6 @@ fun ProfilePage(
                     .verticalScroll(rememberScrollState())
             ) {
 
-                // Profile Info
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -154,7 +158,6 @@ fun ProfilePage(
 
                 Spacer(modifier = Modifier.height(30.dp))
 
-                // Settings Section
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -167,7 +170,6 @@ fun ProfilePage(
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    // Theme Toggle
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -194,113 +196,24 @@ fun ProfilePage(
                         )
                     }
 
-                    // Divider
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-                    // Other Settings
-                    SettingItem(icon = Icons.Default.Person, text = "Account") {}
-                    SettingItem(icon = Icons.Default.Notifications, text = "Notifications") {}
+                    SettingItem(icon = Icons.Default.Person, text = "Account") {
+                        navController.navigate("account_page")
+                    }
+                    SettingItem(icon = Icons.Default.Notifications, text = "Notifications") {
+                        navController.navigate("notifications_page")
+                    }
                     SettingItem(icon = Icons.Default.Lock, text = "Privacy & Security") {
                         navController.navigate("security_page")
                     }
-                    SettingItem(icon = Icons.Default.Info, text = "About") {}
-                    LogOut(icon = Icons.Default.Logout, text = "Log Out", navController)
+                    SettingItem(icon = Icons.Default.Info, text = "About") {
+                        navController.navigate("about_page")
+                    }
+                    LogOutRow(icon = Icons.Default.Logout, text = "Log Out", navController)
                 }
             }
         }
     }
 }
-
-@Composable
-fun SettingItem(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = text,
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-}
-
-@Composable
-fun LogOut(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, navController: NavController) {
-    var showDialog by remember { mutableStateOf(false) }
-    val context = androidx.compose.ui.platform.LocalContext.current
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {showDialog = true }
-            .padding(vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = text,
-            tint = MaterialTheme.colorScheme.error
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.error
-        )
-    }
-    ConfirmLogout(
-        showDialog,
-        onDismiss = { showDialog = false },
-        onConfirm = { 
-            showDialog = false
-            com.example.milesmemories.utils.OfflineProfileManager.clearProfileData(context)
-            // Clear biometric lock preference on logout
-            context.getSharedPreferences("miles_memories_prefs", android.content.Context.MODE_PRIVATE)
-                .edit().putBoolean("biometric_enabled", false).apply()
-            FirebaseAuth.getInstance().signOut()
-            com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(
-                context, 
-                com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN).build()
-            ).signOut()
-            navController.navigate("login_page"){ popUpTo(0) { inclusive = true }  } 
-        })
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-}
-
-@Composable
-fun ConfirmLogout(
-    showDialog: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-){
-    if (showDialog){
-        AlertDialog(
-            onDismissRequest = { onDismiss() },
-            title = { Text("Confirm Logout") },
-            text = { Text("Are you sure you want to log out?") },
-            confirmButton = {
-                TextButton(onClick = { onConfirm() }) {
-                    Text(
-                        "Logout",
-                        color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onDismiss() }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-}
+

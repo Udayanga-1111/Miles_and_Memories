@@ -1,6 +1,11 @@
+/**
+ * Screen for adding or editing a note/journey.
+ * Handles text input, location picking, image selection, and voice recording.
+ */
 package com.example.milesmemories.ui.screens
 
 import android.Manifest
+import com.example.milesmemories.ui.components.DiscardButton
 import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.net.Uri
@@ -521,7 +526,7 @@ fun AddNotePage(
                         }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Discard(navController)
+                    DiscardButton(navController)
                     Spacer(modifier = Modifier.width(8.dp))
                     if (isSaving) {
                         CircularProgressIndicator(
@@ -552,7 +557,6 @@ fun AddNotePage(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp)
             ) {
-            // Title Input
             TextField(
                 value = noteTitle,
                 onValueChange = { noteTitle = it },
@@ -575,7 +579,6 @@ fun AddNotePage(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
             )
 
-            // Date Picker
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -609,7 +612,6 @@ fun AddNotePage(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Location Picker
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1258,52 +1260,3 @@ fun createTempImageUri(context: android.content.Context): Uri {
     return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
 }
 
-@Composable
-fun Discard(navController: NavController) {
-    var showDialog by remember { mutableStateOf(false) }
-    Text(
-        text = "Discard",
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.error,
-        modifier = Modifier
-            .padding(8.dp)
-            .clickable { showDialog = true }
-    )
-
-    ConfirmDiscard(
-        showDialog,
-        onDismiss = { showDialog = false },
-        onConfirm = {
-            showDialog = false
-            navController.navigate("home_screen")
-        }
-    )
-}
-
-@Composable
-fun ConfirmDiscard(
-    showDialog: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { onDismiss() },
-            title = { Text("Confirm Discard") },
-            text = { Text("Are you sure you want to Discard?") },
-            confirmButton = {
-                TextButton(onClick = { onConfirm() }) {
-                    Text(
-                        "Discard",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onDismiss() }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-}

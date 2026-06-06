@@ -13,4 +13,7 @@ sealed class Screen(val route: String) {
     object PicturePage : Screen("picture_page/{title}")
     object WeatherPage : Screen("weather_page")
     object SecurityPage : Screen("security_page")
+    object AccountPage : Screen("account_page")
+    object NotificationsPage : Screen("notifications_page")
+    object AboutPage : Screen("about_page")
 }

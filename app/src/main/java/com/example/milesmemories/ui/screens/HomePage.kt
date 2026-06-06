@@ -1,3 +1,7 @@
+/**
+ * Main dashboard screen displaying the list of journeys/notes.
+ * Handles fetching notes from Firestore, search filtering, and navigation.
+ */
 package com.example.milesmemories.ui.screens
 
 import android.content.res.Configuration
@@ -107,7 +111,6 @@ fun HomePage(navController: NavController) {
             modifier = Modifier.padding(innerPadding)
         ) {
 
-            // Main Content
             LazyColumn(
                 modifier = Modifier
                     .padding(

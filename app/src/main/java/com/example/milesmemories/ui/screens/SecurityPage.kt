@@ -1,3 +1,6 @@
+/**
+ * Screen for managing and reviewing security settings such as Biometric Login.
+ */
 package com.example.milesmemories.ui.screens
 
 import android.content.Context
