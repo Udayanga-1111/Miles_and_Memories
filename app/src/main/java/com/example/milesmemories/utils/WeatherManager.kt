@@ -3,6 +3,7 @@ package com.example.milesmemories.utils
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -19,8 +20,30 @@ data class WeatherData(
 
 object WeatherManager {
     private const val CACHE_FILE_NAME = "weather_cache.json"
+    private const val CITIES_URL = "https://gist.githubusercontent.com/Udayanga-1111/302bef76311e83bc3687ef48ac8d3dd4/raw/cities.json"
 
-    val defaultLocations = listOf("London", "Tokyo", "New York", "Paris")
+    private var defaultLocations = listOf("London", "Tokyo", "New York", "Paris")
+
+    private suspend fun fetchCities(): List<String> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(CITIES_URL)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            val response = conn.inputStream.bufferedReader().readText()
+            val jsonArray = JSONArray(response)
+            val cities = mutableListOf<String>()
+            for (i in 0 until jsonArray.length()) {
+                cities.add(jsonArray.getString(i))
+            }
+            if (cities.isNotEmpty()) {
+                defaultLocations = cities
+            }
+            cities
+        } catch (e: Exception) {
+            e.printStackTrace()
+            defaultLocations
+        }
+    }
 
     suspend fun fetchWeather(context: Context, locationQuery: String): WeatherData? = withContext(Dispatchers.IO) {
         try {
@@ -73,8 +96,9 @@ object WeatherManager {
     }
 
     suspend fun fetchDefaultWeathers(context: Context): List<WeatherData> = withContext(Dispatchers.IO) {
+        val cities = fetchCities()
         val results = mutableListOf<WeatherData>()
-        for (loc in defaultLocations) {
+        for (loc in cities) {
             val w = fetchWeather(context, loc)
             if (w != null) {
                 results.add(w)
