@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "123907310767",
+    "project_id": "miles-and-memories-5c917",
+    "storage_bucket": "miles-and-memories-5c917.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:123907310767:android:51ee5e11821a18ed44805a",
+        "android_client_info": {
+          "package_name": "com.example.milesmemories"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "123907310767-29agjt7f72if8q97m40dhebrndnhg9ld.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.milesmemories",
+            "certificate_hash": "152dfb8c2951875ce8b227dbba2b7de73e9cedda"
+          }
+        },
+        {
+          "client_id": "123907310767-3ohrgbb7mpt4k823jijmcgf9q9t2icfc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfmMV3fKVtX4-dw0ggDYq53SZfonzAQmI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "123907310767-3ohrgbb7mpt4k823jijmcgf9q9t2icfc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

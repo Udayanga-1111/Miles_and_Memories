@@ -13,64 +13,47 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.milesmemories.R
 
-// Portrait Card
+/**
+ * Static journey card previews used in Compose tooling and design previews.
+ */
+
 @Composable
 fun PortraitCard(
-    title:Int,
-    description:Int,
-    date:Int,
-    coverImage:Int,
+    title: Int,
+    description: Int,
+    date: Int,
+    coverImage: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
-
 ) {
     ElevatedCard(
         shape = RoundedCornerShape(24.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
-        modifier = Modifier
+        modifier = modifier
             .padding(bottom = 24.dp)
             .height(400.dp)
             .clickable(onClick = onClick)
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Card Cover Image
+        Box(modifier = Modifier.fillMaxSize()) {
             Image(
                 painter = painterResource(coverImage),
                 contentDescription = null,
@@ -78,25 +61,24 @@ fun PortraitCard(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Action Buttons
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FavButton()
+                FavButton(noteId = "preview", isFavorite = false, onToggle = {})
             }
 
-            // Card Info Overlay
-            Box(modifier = Modifier.background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .9f))
-                .align (Alignment.BottomStart)) {
+            Box(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .9f))
+                    .align(Alignment.BottomStart)
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.BottomStart)
                         .padding(16.dp)
-
                 ) {
                     Text(
                         text = stringResource(title),
@@ -137,23 +119,23 @@ fun PortraitCard(
     }
 }
 
-// Landscape Card
 @Composable
 fun LandscapeCard(
-    title:Int,
-    description:Int,
-    date:Int,
-    coverImage:Int,
+    title: Int,
+    description: Int,
+    date: Int,
+    coverImage: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
-    ) {
+) {
     ElevatedCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer
         ),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-        modifier = modifier.padding(bottom = 16.dp)
+        modifier = modifier
+            .padding(bottom = 16.dp)
             .clickable(onClick = onClick)
     ) {
         Row(
@@ -162,7 +144,6 @@ fun LandscapeCard(
                 .height(160.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Card Cover Image
             Image(
                 painter = painterResource(id = coverImage),
                 contentDescription = null,
@@ -172,7 +153,6 @@ fun LandscapeCard(
                     .fillMaxSize()
             )
 
-            // Card Info
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -192,17 +172,17 @@ fun LandscapeCard(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        FavButton()
+                        FavButton(noteId = "preview", isFavorite = false, onToggle = {})
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
-                    
+
                     Text(
                         text = stringResource(date),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    
+
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
@@ -214,28 +194,6 @@ fun LandscapeCard(
                     )
                 }
             }
-        }
-    }
-}
-
-// Fav Button
-@Composable
-fun FavButton() {
-    var isFavorite by remember { mutableStateOf(false) }
-
-    Surface(
-        onClick = { isFavorite = !isFavorite },
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-        modifier = Modifier.size(40.dp)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                painter = painterResource(R.drawable.nav_fav_icon),
-                contentDescription = "Favorite",
-                tint = if (isFavorite) Color(0xFFFF4081) else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(25.dp)
-            )
         }
     }
 }

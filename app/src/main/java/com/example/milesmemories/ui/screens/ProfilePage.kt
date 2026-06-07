@@ -1,3 +1,7 @@
+/**
+ * Screen displaying user profile and application settings.
+ * Supports theme toggling and logging out.
+ */
 package com.example.milesmemories.ui.screens
 
 import androidx.compose.foundation.Image
@@ -25,6 +29,12 @@ import androidx.navigation.NavController
 import com.example.milesmemories.R
 import com.example.milesmemories.ui.components.NavigationBar
 import com.example.milesmemories.ui.components.TitleHeader
+import com.example.milesmemories.ui.components.SettingItem
+import com.example.milesmemories.ui.components.LogOutRow
+import com.google.firebase.auth.FirebaseAuth
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.size
+import coil.compose.AsyncImage
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.width
@@ -44,6 +54,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun ProfilePage(
@@ -51,6 +62,35 @@ fun ProfilePage(
     isDarkTheme: Boolean,
     onThemeChange: (Boolean) -> Unit
 ) {
+    val auth = remember { FirebaseAuth.getInstance() }
+    val currentUser = auth.currentUser
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    var displayName by remember { mutableStateOf<String?>("Adventure Awaits!") }
+    var email by remember { mutableStateOf<String?>(null) }
+    var photoUrl by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        val cachedProfile = com.example.milesmemories.utils.OfflineProfileManager.loadProfileData(context)
+        if (cachedProfile != null) {
+            displayName = cachedProfile.name ?: "Adventure Awaits!"
+            email = cachedProfile.email
+            photoUrl = cachedProfile.photoUrl
+        }
+        
+        if (currentUser != null) {
+            displayName = currentUser.displayName
+            email = currentUser.email
+            photoUrl = currentUser.photoUrl?.toString()
+            
+            com.example.milesmemories.utils.OfflineProfileManager.saveProfileData(
+                context, 
+                currentUser.displayName, 
+                currentUser.email, 
+                currentUser.photoUrl?.toString()
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -66,7 +106,6 @@ fun ProfilePage(
             verticalArrangement = Arrangement.SpaceAround,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // Main Content
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -74,32 +113,51 @@ fun ProfilePage(
                     .verticalScroll(rememberScrollState())
             ) {
 
-                // Profile Info
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .padding(5.dp)
                         .fillMaxWidth()
                 ) {
-                    Image(
-                        painter = painterResource(R.drawable.profile_pic),
-                        contentDescription = "Profile picture",
-                        modifier = Modifier.clip(RoundedCornerShape(200.dp))
-                    )
+                    if (photoUrl != null) {
+                        AsyncImage(
+                            model = photoUrl,
+                            contentDescription = "Profile picture",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(RoundedCornerShape(60.dp))
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(R.drawable.profile_pic),
+                            contentDescription = "Profile picture",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(RoundedCornerShape(60.dp))
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Udayanga Dilshan",
+                        text = displayName ?: "Adventure Awaits!",
                         style = MaterialTheme.typography.bodyLarge,
                         fontSize = 30.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    if (email != null) {
+                        Text(
+                            text = email!!,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(30.dp))
 
-                // Settings Section
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -112,7 +170,6 @@ fun ProfilePage(
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    // Theme Toggle
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -139,99 +196,24 @@ fun ProfilePage(
                         )
                     }
 
-                    // Divider
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-                    // Other Settings
-                    SettingItem(icon = Icons.Default.Person, text = "Account")
-                    SettingItem(icon = Icons.Default.Notifications, text = "Notifications")
-                    SettingItem(icon = Icons.Default.Lock, text = "Privacy & Security")
-                    SettingItem(icon = Icons.Default.Info, text = "About")
-                    LogOut(icon = Icons.Default.Logout, text = "Log Out", navController)
+                    SettingItem(icon = Icons.Default.Person, text = "Account") {
+                        navController.navigate("account_page")
+                    }
+                    SettingItem(icon = Icons.Default.Notifications, text = "Notifications") {
+                        navController.navigate("notifications_page")
+                    }
+                    SettingItem(icon = Icons.Default.Lock, text = "Privacy & Security") {
+                        navController.navigate("security_page")
+                    }
+                    SettingItem(icon = Icons.Default.Info, text = "About") {
+                        navController.navigate("about_page")
+                    }
+                    LogOutRow(icon = Icons.Default.Logout, text = "Log Out", navController)
                 }
             }
         }
     }
 }
-
-@Composable
-fun SettingItem(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { }
-            .padding(vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = text,
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-}
-
-@Composable
-fun LogOut(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, navController: NavController) {
-    var showDialog by remember { mutableStateOf(false) }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {showDialog = true }
-            .padding(vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = text,
-            tint = MaterialTheme.colorScheme.error
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.error
-        )
-    }
-    ConfirmLogout(
-        showDialog,
-        onDismiss = { showDialog = false },
-        onConfirm = { showDialog = false
-            navController.navigate("login_page"){ popUpTo(0) { inclusive = true }  } })
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-}
-
-@Composable
-fun ConfirmLogout(
-    showDialog: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-){
-    if (showDialog){
-        AlertDialog(
-            onDismissRequest = { onDismiss() },
-            title = { Text("Confirm Logout") },
-            text = { Text("Are you sure you want to log out?") },
-            confirmButton = {
-                TextButton(onClick = { onConfirm() }) {
-                    Text(
-                        "Logout",
-                        color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onDismiss() }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-}
+

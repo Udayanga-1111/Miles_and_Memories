@@ -1,3 +1,7 @@
+/**
+ * Screen for user registration (Sign Up).
+ * Supports Email/Password and Google Sign-Up.
+ */
 package com.example.milesmemories.ui.screens
 
 import androidx.compose.foundation.Image
@@ -20,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -29,6 +34,19 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.milesmemories.R
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.OAuthProvider
+import android.util.Log
 
 @Composable
 fun SignupPage(
@@ -39,6 +57,46 @@ fun SignupPage(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var nameError by remember { mutableStateOf(false) }
+    var emailError by remember { mutableStateOf(false) }
+    var passwordError by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val auth = remember { FirebaseAuth.getInstance() }
+
+    val webClientId = stringResource(R.string.default_web_client_id)
+    val gso = remember(webClientId) {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(webClientId)
+            .requestEmail()
+            .build()
+    }
+    val googleSignInClient = remember(gso) { GoogleSignIn.getClient(context, gso) }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)!!
+                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+                isLoading = true
+                auth.signInWithCredential(credential).addOnCompleteListener { authTask ->
+                    isLoading = false
+                    if (authTask.isSuccessful) {
+                        Toast.makeText(context, "Google Signup Successful", Toast.LENGTH_SHORT).show()
+                        navController.navigate("home_screen") { popUpTo(0) { inclusive = true } }
+                    } else {
+                        Toast.makeText(context, "Signup Failed: ${authTask.exception?.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: ApiException) {
+                Toast.makeText(context, "Google sign-in failed. Try again.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -62,7 +120,6 @@ fun SignupPage(
                         elevation = 8.dp
                     )
             )
-            // Header
             Text(
                 text = "Create Account",
                 style = MaterialTheme.typography.displaySmall,
@@ -78,11 +135,15 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Name Field
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = { 
+                    name = it
+                    if (nameError) nameError = false
+                },
                 label = { Text("Full Name") },
+                isError = nameError,
+                supportingText = { if (nameError) Text("Name cannot be empty") },
                 leadingIcon = { Icon(imageVector = Icons.Default.Person, contentDescription = "Person Icon") },
                 modifier = Modifier.width(400.dp),
                 singleLine = true,
@@ -98,11 +159,15 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Email Field
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { 
+                    email = it
+                    if (emailError) emailError = false
+                },
                 label = { Text("Email") },
+                isError = emailError,
+                supportingText = { if (emailError) Text("Email cannot be empty") },
                 leadingIcon = { Icon(imageVector = Icons.Default.Email, contentDescription = "Email Icon") },
                 modifier = Modifier.width(400.dp),
                 singleLine = true,
@@ -118,11 +183,15 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Password Field
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { 
+                    password = it
+                    if (passwordError) passwordError = false
+                },
                 label = { Text("Password") },
+                isError = passwordError,
+                supportingText = { if (passwordError) Text("Password cannot be empty") },
                 leadingIcon = { Icon(imageVector = Icons.Default.Lock, contentDescription = "Lock Icon") },
                 trailingIcon = {
                     val image = if (passwordVisible)
@@ -149,9 +218,38 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Sign Up Button
             Button(
-                onClick = {navController.navigate("home_screen"){ popUpTo(0) { inclusive = true }}},
+                onClick = {
+                    nameError = name.isEmpty()
+                    emailError = email.isEmpty()
+                    passwordError = password.isEmpty()
+                    
+                    if (!nameError && !emailError && !passwordError) {
+                        isLoading = true
+                        auth.createUserWithEmailAndPassword(email, password)
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    val user = auth.currentUser
+                                    val profileUpdates = UserProfileChangeRequest.Builder()
+                                        .setDisplayName(name)
+                                        .build()
+                                    
+                                    user?.updateProfile(profileUpdates)
+                                        ?.addOnCompleteListener {
+                                            isLoading = false
+                                            Toast.makeText(context, "Account Created", Toast.LENGTH_SHORT).show()
+                                            navController.navigate("home_screen") { popUpTo(0) { inclusive = true } }
+                                        }
+                                } else {
+                                    isLoading = false
+                                    Toast.makeText(context, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                    } else {
+                        Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                enabled = !isLoading,
                 modifier = Modifier
                     .width(400.dp)
                     .height(50.dp),
@@ -161,16 +259,22 @@ fun SignupPage(
                 ),
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {
-                Text(
-                    text = "Sign Up",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Text(
+                        text = "Sign Up",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // "Or continue with" divider
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -193,41 +297,24 @@ fun SignupPage(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Social Logins
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                // Google Button
                 OutlinedButton(
-                    onClick = { /* Handle Google Signup */ },
+                    onClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) },
                     modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp)
-                        .padding(end = 8.dp),
+                        .fillMaxWidth()
+                        .height(50.dp),
                     shape = RoundedCornerShape(24.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                 ) {
                     Text("Google", color = MaterialTheme.colorScheme.onSurface)
                 }
-
-                // Facebook Button
-                OutlinedButton(
-                    onClick = { /* Handle Facebook Signup */ },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp)
-                        .padding(start = 8.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-                ) {
-                    Text("Facebook", color = MaterialTheme.colorScheme.onSurface)
-                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Login Link
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center

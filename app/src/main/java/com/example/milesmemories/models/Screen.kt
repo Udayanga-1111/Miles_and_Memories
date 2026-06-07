@@ -8,8 +8,12 @@ sealed class Screen(val route: String) {
     object ProfilePage: Screen("profile_page")
     object LoginPage : Screen("login_page")
     object SignupPage : Screen("signup_page")
-    object AddNotePage : Screen("add_note_page/{page}/{title}/{description}/{date}")
-    object NoteDetailsPage : Screen("note_details_page/{title}/{description}/{date}/{coverImage}")
+    object AddNotePage : Screen("add_note_page/{page}?noteId={noteId}")
+    object NoteDetailsPage : Screen("note_details_page/{noteId}")
     object PicturePage : Screen("picture_page/{title}")
-
+    object WeatherPage : Screen("weather_page")
+    object SecurityPage : Screen("security_page")
+    object AccountPage : Screen("account_page")
+    object NotificationsPage : Screen("notifications_page")
+    object AboutPage : Screen("about_page")
 }
