@@ -58,6 +58,9 @@ fun SignupPage(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
+    var nameError by remember { mutableStateOf(false) }
+    var emailError by remember { mutableStateOf(false) }
+    var passwordError by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val auth = remember { FirebaseAuth.getInstance() }
@@ -134,8 +137,13 @@ fun SignupPage(
 
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = { 
+                    name = it
+                    if (nameError) nameError = false
+                },
                 label = { Text("Full Name") },
+                isError = nameError,
+                supportingText = { if (nameError) Text("Name cannot be empty") },
                 leadingIcon = { Icon(imageVector = Icons.Default.Person, contentDescription = "Person Icon") },
                 modifier = Modifier.width(400.dp),
                 singleLine = true,
@@ -153,8 +161,13 @@ fun SignupPage(
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { 
+                    email = it
+                    if (emailError) emailError = false
+                },
                 label = { Text("Email") },
+                isError = emailError,
+                supportingText = { if (emailError) Text("Email cannot be empty") },
                 leadingIcon = { Icon(imageVector = Icons.Default.Email, contentDescription = "Email Icon") },
                 modifier = Modifier.width(400.dp),
                 singleLine = true,
@@ -172,8 +185,13 @@ fun SignupPage(
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { 
+                    password = it
+                    if (passwordError) passwordError = false
+                },
                 label = { Text("Password") },
+                isError = passwordError,
+                supportingText = { if (passwordError) Text("Password cannot be empty") },
                 leadingIcon = { Icon(imageVector = Icons.Default.Lock, contentDescription = "Lock Icon") },
                 trailingIcon = {
                     val image = if (passwordVisible)
@@ -202,7 +220,11 @@ fun SignupPage(
 
             Button(
                 onClick = {
-                    if (email.isNotEmpty() && password.isNotEmpty() && name.isNotEmpty()) {
+                    nameError = name.isEmpty()
+                    emailError = email.isEmpty()
+                    passwordError = password.isEmpty()
+                    
+                    if (!nameError && !emailError && !passwordError) {
                         isLoading = true
                         auth.createUserWithEmailAndPassword(email, password)
                             .addOnCompleteListener { task ->

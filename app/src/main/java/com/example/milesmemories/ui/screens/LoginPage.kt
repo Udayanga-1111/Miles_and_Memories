@@ -63,6 +63,8 @@ fun LoginPage(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
+    var emailError by remember { mutableStateOf(false) }
+    var passwordError by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val activity = context as? FragmentActivity
@@ -232,8 +234,13 @@ fun LoginPage(
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { 
+                    email = it
+                    if (emailError) emailError = false
+                },
                 label = { Text("Email") },
+                isError = emailError,
+                supportingText = { if (emailError) Text("Email cannot be empty") },
                 leadingIcon = { Icon(imageVector = Icons.Default.Email, contentDescription = "Email Icon") },
                 modifier = Modifier.width(400.dp),
                 singleLine = true,
@@ -248,8 +255,13 @@ fun LoginPage(
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { 
+                    password = it
+                    if (passwordError) passwordError = false
+                },
                 label = { Text("Password") },
+                isError = passwordError,
+                supportingText = { if (passwordError) Text("Password cannot be empty") },
                 leadingIcon = { Icon(imageVector = Icons.Default.Lock, contentDescription = "Lock Icon") },
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -273,7 +285,10 @@ fun LoginPage(
 
             Button(
                 onClick = {
-                    if (email.isNotEmpty() && password.isNotEmpty()) {
+                    emailError = email.isEmpty()
+                    passwordError = password.isEmpty()
+                    
+                    if (!emailError && !passwordError) {
                         isLoading = true
                         auth.signInWithEmailAndPassword(email, password)
                             .addOnCompleteListener { task ->
@@ -285,6 +300,8 @@ fun LoginPage(
                                     Toast.makeText(context, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                                 }
                             }
+                    } else {
+                        Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
                     }
                 },
                 enabled = !isLoading,
