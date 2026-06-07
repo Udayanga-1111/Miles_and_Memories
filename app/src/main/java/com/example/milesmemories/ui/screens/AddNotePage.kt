@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -117,6 +118,7 @@ import org.osmdroid.views.overlay.Marker
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
 import android.os.Environment
+import androidx.compose.ui.zIndex
 
 @Composable
 fun AddNotePage(
@@ -217,15 +219,11 @@ fun AddNotePage(
                         val addresses = geocoder.getFromLocation(loc.latitude, loc.longitude, 1)
                         val addressName = if (!addresses.isNullOrEmpty()) {
                             val addr = addresses[0]
-                            val feature = addr.featureName
                             val city = addr.locality ?: addr.subAdminArea ?: addr.adminArea
-                            val isNumeric = feature?.matches(Regex("\\d+[a-zA-Z]*(-?\\d+[a-zA-Z]*)?")) == true
-                            if (!feature.isNullOrBlank() && !isNumeric && feature != city) {
-                                if (!city.isNullOrBlank()) "$feature, $city" else feature
-                            } else if (!city.isNullOrBlank()) {
+                            if (!city.isNullOrBlank()) {
                                 city
                             } else {
-                                addr.getAddressLine(0) ?: "${loc.latitude},${loc.longitude}"
+                                addr.featureName ?: addr.getAddressLine(0) ?: "${loc.latitude},${loc.longitude}"
                             }
                         } else {
                             "${loc.latitude},${loc.longitude}"
@@ -1018,23 +1016,85 @@ fun AddNotePage(
 
     if (showMapPicker) {
         var mapMarkerLocation by remember { mutableStateOf<GeoPoint?>(null) }
+        var mapSearchQuery by remember { mutableStateOf("") }
+        var isSearchingLocation by remember { mutableStateOf(false) }
+        var mapViewRef by remember { mutableStateOf<MapView?>(null) }
+        var mapMarkerRef by remember { mutableStateOf<Marker?>(null) }
         
         Dialog(
             onDismissRequest = { showMapPicker = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
         ) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
+                    .background(MaterialTheme.colorScheme.surface)
             ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // Top Bar
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surface)
-                            .padding(16.dp),
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                ) {
+                // MapView
+                AndroidView(
+                    factory = { ctx ->
+                        OsmConfig.getInstance().userAgentValue = ctx.packageName
+                        val mapView = MapView(ctx)
+                        mapView.setMultiTouchControls(true)
+                        mapView.controller.setZoom(15.0)
+
+                        // Initial position (use current location if set, else center of world)
+                        val startPoint = if (location.isNotBlank() && location.contains(",")) {
+                            val parts = location.split(",")
+                            val lat = parts[0].trim().toDoubleOrNull()
+                            val lng = parts[1].trim().toDoubleOrNull()
+                            if (lat != null && lng != null) {
+                                GeoPoint(lat, lng)
+                            } else {
+                                GeoPoint(6.9271, 79.8612) // Default to Colombo
+                            }
+                        } else {
+                            GeoPoint(6.9271, 79.8612)
+                        }
+                        mapView.controller.setCenter(startPoint)
+
+                        val marker = Marker(mapView)
+                        marker.position = startPoint
+                        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        mapView.overlays.add(marker)
+                        mapMarkerLocation = startPoint
+                        mapMarkerRef = marker
+                        mapViewRef = mapView
+
+                        val receive = object : MapEventsReceiver {
+                            override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
+                                p?.let {
+                                    marker.position = it
+                                    mapMarkerLocation = it
+                                    mapView.invalidate()
+                                }
+                                return true
+                            }
+                            override fun longPressHelper(p: GeoPoint?): Boolean = false
+                        }
+                        mapView.overlays.add(MapEventsOverlay(receive))
+
+                        mapView
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.9f))
+                ) {
+                        // Top Bar
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 20.dp, start = 16.dp, end = 16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1049,15 +1109,10 @@ fun AddNotePage(
                     }
 
                     // Search Bar
-                    var mapSearchQuery by remember { mutableStateOf("") }
-                    var isSearchingLocation by remember { mutableStateOf(false) }
-                    var mapViewRef by remember { mutableStateOf<MapView?>(null) }
-                    var mapMarkerRef by remember { mutableStateOf<Marker?>(null) }
-
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TextField(
@@ -1099,6 +1154,51 @@ fun AddNotePage(
                                     }
                                 }
                             }),
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        if (mapSearchQuery.isNotBlank()) {
+                                            isSearchingLocation = true
+                                            coroutineScope.launch(Dispatchers.IO) {
+                                                try {
+                                                    val geocoder = Geocoder(context, Locale.getDefault())
+                                                    val results = geocoder.getFromLocationName(mapSearchQuery, 1)
+                                                    if (!results.isNullOrEmpty()) {
+                                                        val result = results[0]
+                                                        val point = GeoPoint(result.latitude, result.longitude)
+                                                        withContext(Dispatchers.Main) {
+                                                            mapMarkerLocation = point
+                                                            mapViewRef?.controller?.animateTo(point)
+                                                            mapMarkerRef?.position = point
+                                                            mapViewRef?.invalidate()
+                                                            isSearchingLocation = false
+                                                        }
+                                                    } else {
+                                                        withContext(Dispatchers.Main) {
+                                                            isSearchingLocation = false
+                                                            Toast.makeText(context, "Location not found", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                } catch (e: Exception) {
+                                                    withContext(Dispatchers.Main) {
+                                                        isSearchingLocation = false
+                                                        Toast.makeText(context, "Search failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    if (isSearchingLocation) {
+                                        CircularProgressIndicator(
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    } else {
+                                        Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            },
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -1107,102 +1207,8 @@ fun AddNotePage(
                             ),
                             shape = RoundedCornerShape(8.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(
-                            onClick = {
-                                if (mapSearchQuery.isNotBlank()) {
-                                    isSearchingLocation = true
-                                    coroutineScope.launch(Dispatchers.IO) {
-                                        try {
-                                            val geocoder = Geocoder(context, Locale.getDefault())
-                                            val results = geocoder.getFromLocationName(mapSearchQuery, 1)
-                                            if (!results.isNullOrEmpty()) {
-                                                val result = results[0]
-                                                val point = GeoPoint(result.latitude, result.longitude)
-                                                withContext(Dispatchers.Main) {
-                                                    mapMarkerLocation = point
-                                                    mapViewRef?.controller?.animateTo(point)
-                                                    mapMarkerRef?.position = point
-                                                    mapViewRef?.invalidate()
-                                                    isSearchingLocation = false
-                                                }
-                                            } else {
-                                                withContext(Dispatchers.Main) {
-                                                    isSearchingLocation = false
-                                                    Toast.makeText(context, "Location not found", Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                        } catch (e: Exception) {
-                                            withContext(Dispatchers.Main) {
-                                                isSearchingLocation = false
-                                                Toast.makeText(context, "Search failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
-                        ) {
-                            if (isSearchingLocation) {
-                                CircularProgressIndicator(
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            } else {
-                                Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onPrimary)
-                            }
-                        }
                     }
-
-                    // MapView
-                    AndroidView(
-                        factory = { ctx ->
-                            OsmConfig.getInstance().userAgentValue = ctx.packageName
-                            val mapView = MapView(ctx)
-                            mapView.setMultiTouchControls(true)
-                            mapView.controller.setZoom(15.0)
-
-                            // Initial position (use current location if set, else center of world)
-                            val startPoint = if (location.isNotBlank() && location.contains(",")) {
-                                val parts = location.split(",")
-                                val lat = parts[0].trim().toDoubleOrNull()
-                                val lng = parts[1].trim().toDoubleOrNull()
-                                if (lat != null && lng != null) {
-                                    GeoPoint(lat, lng)
-                                } else {
-                                    GeoPoint(6.9271, 79.8612) // Default to Colombo
-                                }
-                            } else {
-                                GeoPoint(6.9271, 79.8612)
-                            }
-                            mapView.controller.setCenter(startPoint)
-
-                            val marker = Marker(mapView)
-                            marker.position = startPoint
-                            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            mapView.overlays.add(marker)
-                            mapMarkerLocation = startPoint
-                            mapMarkerRef = marker
-                            mapViewRef = mapView
-
-                            val receive = object : MapEventsReceiver {
-                                override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
-                                    p?.let {
-                                        marker.position = it
-                                        mapMarkerLocation = it
-                                        mapView.invalidate()
-                                    }
-                                    return true
-                                }
-                                override fun longPressHelper(p: GeoPoint?): Boolean = false
-                            }
-                            mapView.overlays.add(MapEventsOverlay(receive))
-
-                            mapView
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
+                }
 
                     // Confirm Button
                     TextButton(
@@ -1214,15 +1220,11 @@ fun AddNotePage(
                                         val addresses = geocoder.getFromLocation(geoPoint.latitude, geoPoint.longitude, 1)
                                         val addressName = if (!addresses.isNullOrEmpty()) {
                                             val addr = addresses[0]
-                                            val feature = addr.featureName
                                             val city = addr.locality ?: addr.subAdminArea ?: addr.adminArea
-                                            val isNumeric = feature?.matches(Regex("\\d+[a-zA-Z]*(-?\\d+[a-zA-Z]*)?")) == true
-                                            if (!feature.isNullOrBlank() && !isNumeric && feature != city) {
-                                                if (!city.isNullOrBlank()) "$feature, $city" else feature
-                                            } else if (!city.isNullOrBlank()) {
+                                            if (!city.isNullOrBlank()) {
                                                 city
                                             } else {
-                                                addr.getAddressLine(0) ?: "${geoPoint.latitude},${geoPoint.longitude}"
+                                                addr.featureName ?: addr.getAddressLine(0) ?: "${geoPoint.latitude},${geoPoint.longitude}"
                                             }
                                         } else {
                                             "${geoPoint.latitude},${geoPoint.longitude}"
@@ -1243,13 +1245,15 @@ fun AddNotePage(
                             }
                         },
                         modifier = Modifier
+                            .align(Alignment.BottomCenter)
                             .fillMaxWidth()
+                            .navigationBarsPadding()
                             .padding(16.dp)
                             .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
                     ) {
                         Text("Confirm Location", color = MaterialTheme.colorScheme.onPrimary)
                     }
-                }
+            }
             }
         }
     }
